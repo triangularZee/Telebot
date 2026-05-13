@@ -24,6 +24,7 @@ export const config = {
   aiProvider: process.env.AI_PROVIDER ?? 'claude',
   claudeModel: process.env.CLAUDE_MODEL ?? 'claude-sonnet-4-6',
   claudeEffort: process.env.CLAUDE_EFFORT ?? 'medium',
+  claudeContinue: (process.env.CLAUDE_CONTINUE ?? 'true').toLowerCase() === 'true',
   openaiApiKey: process.env.OPENAI_API_KEY ?? '',
   openaiModel: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
   googleAiApiKey: process.env.GOOGLE_AI_API_KEY ?? process.env.GEMINI_API_KEY ?? '',

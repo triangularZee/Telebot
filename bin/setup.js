@@ -162,6 +162,7 @@ const maxOutput = String(args['max-output'] ?? 3500);
 const aiProvider = String(args['ai-provider'] ?? 'claude');
 const claudeModel = String(args['claude-model'] ?? process.env.CLAUDE_MODEL ?? 'claude-sonnet-4-6');
 const claudeEffort = String(args['claude-effort'] ?? process.env.CLAUDE_EFFORT ?? 'medium');
+const claudeContinue = String(args['claude-continue'] ?? process.env.CLAUDE_CONTINUE ?? 'true');
 const openaiApiKey = String(args['openai-api-key'] ?? process.env.OPENAI_API_KEY ?? '');
 const openaiModel = String(args['openai-model'] ?? process.env.OPENAI_MODEL ?? 'gpt-4o-mini');
 const googleAiApiKey = String(args['google-ai-api-key'] ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GEMINI_API_KEY ?? '');
@@ -181,6 +182,7 @@ writeEnv(envPath, {
   AI_PROVIDER: aiProvider,
   CLAUDE_MODEL: claudeModel,
   CLAUDE_EFFORT: claudeEffort,
+  CLAUDE_CONTINUE: claudeContinue,
   OPENAI_API_KEY: openaiApiKey,
   OPENAI_MODEL: openaiModel,
   GOOGLE_AI_API_KEY: googleAiApiKey,

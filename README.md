@@ -74,6 +74,7 @@ Provider environment variables:
 AI_PROVIDER=claude
 CLAUDE_MODEL=claude-sonnet-4-6
 CLAUDE_EFFORT=medium
+CLAUDE_CONTINUE=true
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
 GOOGLE_AI_API_KEY=
@@ -99,6 +100,7 @@ npm run setup -- \
   --ai-provider claude \
   --claude-model claude-sonnet-4-6 \
   --claude-effort medium \
+  --claude-continue true \
   --openai-api-key "$OPENAI_API_KEY" \
   --google-ai-api-key "$GOOGLE_AI_API_KEY"
 ```
