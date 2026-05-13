@@ -29,6 +29,40 @@ async function replyLong(ctx, text) {
   }
 }
 
+async function startProgress(ctx, label) {
+  const frames = [
+    `${label} is processing`,
+    `${label} is processing.`,
+    `${label} is processing..`,
+    `${label} is processing...`,
+    `${label} is processing....`,
+    `${label} is processing.....`
+  ];
+  const message = await ctx.reply(frames[0]);
+  let index = 1;
+  const timer = setInterval(async () => {
+    try {
+      await ctx.api.editMessageText(ctx.chat.id, message.message_id, frames[index % frames.length]);
+      index += 1;
+    } catch {
+      clearInterval(timer);
+    }
+  }, 1200);
+
+  return {
+    stop: async (finalText = null) => {
+      clearInterval(timer);
+      if (finalText) {
+        try {
+          await ctx.api.editMessageText(ctx.chat.id, message.message_id, finalText);
+        } catch {
+          await ctx.reply(finalText);
+        }
+      }
+    }
+  };
+}
+
 function helpText() {
   return [
     'Telebot commands:',
@@ -105,14 +139,17 @@ bot.command('run', async (ctx) => {
 });
 
 async function handleAi(ctx, provider) {
+  let progress = null;
   try {
     const prompt = argText(ctx);
     const selected = providerLabel(provider);
     if (!prompt) throw new Error(`Usage: /${selected === config.aiProvider ? 'ai' : selected} prompt`);
-    await ctx.reply(`${selected} is thinking...`);
+    progress = await startProgress(ctx, selected);
     const output = await runProvider(selected, prompt, { cwd: cwdFor(ctx) });
+    await progress.stop();
     await replyLong(ctx, output);
   } catch (error) {
+    if (progress) await progress.stop('Processing failed.');
     await ctx.reply(`Error: ${error.message}`);
   }
 }

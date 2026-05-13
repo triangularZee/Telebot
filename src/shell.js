@@ -81,3 +81,50 @@ export function runCommand(cwd, command) {
     });
   });
 }
+
+export function runCommandRaw(cwd, command) {
+  if (!command) throw new Error('Command is required');
+
+  const isWindows = os.platform() === 'win32';
+  const shell = isWindows ? 'powershell.exe' : '/bin/bash';
+  const args = isWindows
+    ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', command]
+    : ['-lc', command];
+
+  return new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    const child = spawn(shell, args, {
+      cwd,
+      windowsHide: true
+    });
+
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM');
+      stderr += `\n[terminated after ${config.commandTimeoutMs}ms]`;
+    }, config.commandTimeoutMs);
+
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve({
+        code,
+        stdout: clampOutput(stdout.trim()),
+        stderr: clampOutput(stderr.trim())
+      });
+    });
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      resolve({
+        code: 1,
+        stdout: '',
+        stderr: error.message
+      });
+    });
+  });
+}
