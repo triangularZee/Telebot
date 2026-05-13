@@ -150,7 +150,7 @@ const token = requireArg(args, 'token');
 const chatId = requireArg(args, 'chat-id');
 const root = path.resolve(args.root ? String(args.root) : homeDir);
 const timeout = String(args.timeout ?? 60000);
-const maxOutput = String(args.max-output ?? 3500);
+const maxOutput = String(args['max-output'] ?? 3500);
 const envDir = os.platform() === 'darwin'
   ? path.join(homeDir, 'Library', 'Application Support', 'telebot')
   : path.join(process.env.XDG_STATE_HOME || path.join(homeDir, '.local', 'state'), 'telebot');
