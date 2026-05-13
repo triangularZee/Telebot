@@ -20,5 +20,10 @@ export const config = {
     .filter(Boolean),
   rootDir: path.resolve(repoRoot, process.env.TELEBOT_ROOT_DIR ?? '.'),
   commandTimeoutMs: Number(process.env.TELEBOT_COMMAND_TIMEOUT_MS ?? 60000),
-  maxOutputChars: Number(process.env.TELEBOT_MAX_OUTPUT_CHARS ?? 3500)
+  maxOutputChars: Number(process.env.TELEBOT_MAX_OUTPUT_CHARS ?? 3500),
+  aiProvider: process.env.AI_PROVIDER ?? 'claude',
+  openaiApiKey: process.env.OPENAI_API_KEY ?? '',
+  openaiModel: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
+  googleAiApiKey: process.env.GOOGLE_AI_API_KEY ?? process.env.GEMINI_API_KEY ?? '',
+  geminiModel: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash'
 };

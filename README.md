@@ -44,7 +44,10 @@ npm start
 /cd path
 /cat path
 /run command
+/ai prompt
 /claude prompt
+/gpt prompt
+/gemini prompt
 ```
 
 Examples:
@@ -54,11 +57,25 @@ Examples:
 /cd C:\Users\J\Documents\Codex
 /run git status --short
 /cat README.md
+/ai summarize this repository
 /claude summarize this repository
+/gpt summarize this repository
+/gemini summarize this repository
 ```
 
 `/run` executes commands on the machine running Telebot. Keep the bot token private and restrict `TELEGRAM_ALLOWED_CHAT_IDS`.
 `/claude` runs `claude -p` in the current working directory. Claude Code must already be installed and authenticated on the remote machine.
+`/ai` uses `AI_PROVIDER`; `/claude`, `/gpt`, and `/gemini` force a specific provider.
+
+Provider environment variables:
+
+```env
+AI_PROVIDER=claude
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+GOOGLE_AI_API_KEY=
+GEMINI_MODEL=gemini-2.5-flash
+```
 
 ## Linux Service Install
 
@@ -67,6 +84,18 @@ On Ubuntu/Linux after cloning the repo:
 ```bash
 npm install
 npm run setup -- --token "123456:ABC..." --chat-id "123456789" --root "$HOME"
+```
+
+Optional provider flags:
+
+```bash
+npm run setup -- \
+  --token "123456:ABC..." \
+  --chat-id "123456789" \
+  --root "$HOME" \
+  --ai-provider claude \
+  --openai-api-key "$OPENAI_API_KEY" \
+  --google-ai-api-key "$GOOGLE_AI_API_KEY"
 ```
 
 This creates:
@@ -117,5 +146,5 @@ It creates:
 - Use a dedicated bot token.
 - Set `TELEGRAM_ALLOWED_CHAT_IDS`; leaving it empty is refused.
 - Treat `/run` as full remote shell access.
-- Treat `/claude` as remote AI-agent access to the current directory.
+- Treat `/ai`, `/claude`, `/gpt`, and `/gemini` as remote AI-agent access.
 - Rotate the token in BotFather if it has been shared with another service.

@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from './config.js';
 import { listDir, readTextFile, resolveFrom, runCommand } from './shell.js';
+import { providerLabel, runProvider } from './providers/index.js';
 
 const bot = new Bot(config.botToken);
 const cwdByChat = new Map();
@@ -36,8 +37,12 @@ function helpText() {
     '/cd path',
     '/cat path',
     '/run command',
+    '/ai prompt',
     '/claude prompt',
+    '/gpt prompt',
+    '/gemini prompt',
     '',
+    `Default AI provider: ${providerLabel()}`,
     'This bot only accepts configured chat IDs.'
   ].join('\n');
 }
@@ -99,19 +104,33 @@ bot.command('run', async (ctx) => {
   }
 });
 
-bot.command('claude', async (ctx) => {
+async function handleAi(ctx, provider) {
   try {
     const prompt = argText(ctx);
-    if (!prompt) throw new Error('Usage: /claude prompt');
-    await ctx.reply('Claude is thinking...');
-    const output = await runCommand(
-      cwdFor(ctx),
-      `claude -p --permission-mode default --max-budget-usd 1 ${JSON.stringify(prompt)}`
-    );
+    const selected = providerLabel(provider);
+    if (!prompt) throw new Error(`Usage: /${selected === config.aiProvider ? 'ai' : selected} prompt`);
+    await ctx.reply(`${selected} is thinking...`);
+    const output = await runProvider(selected, prompt, { cwd: cwdFor(ctx) });
     await replyLong(ctx, output);
   } catch (error) {
     await ctx.reply(`Error: ${error.message}`);
   }
+}
+
+bot.command('ai', async (ctx) => {
+  await handleAi(ctx, config.aiProvider);
+});
+
+bot.command('claude', async (ctx) => {
+  await handleAi(ctx, 'claude');
+});
+
+bot.command('gpt', async (ctx) => {
+  await handleAi(ctx, 'openai');
+});
+
+bot.command('gemini', async (ctx) => {
+  await handleAi(ctx, 'gemini');
 });
 
 bot.on('message:text', async (ctx) => {

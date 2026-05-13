@@ -159,6 +159,11 @@ const chatId = requireArg(args, 'chat-id');
 const root = path.resolve(args.root ? String(args.root) : homeDir);
 const timeout = String(args.timeout ?? 60000);
 const maxOutput = String(args['max-output'] ?? 3500);
+const aiProvider = String(args['ai-provider'] ?? 'claude');
+const openaiApiKey = String(args['openai-api-key'] ?? process.env.OPENAI_API_KEY ?? '');
+const openaiModel = String(args['openai-model'] ?? process.env.OPENAI_MODEL ?? 'gpt-4o-mini');
+const googleAiApiKey = String(args['google-ai-api-key'] ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GEMINI_API_KEY ?? '');
+const geminiModel = String(args['gemini-model'] ?? process.env.GEMINI_MODEL ?? 'gemini-2.5-flash');
 const envDir = os.platform() === 'darwin'
   ? path.join(homeDir, 'Library', 'Application Support', 'telebot')
   : path.join(process.env.XDG_STATE_HOME || path.join(homeDir, '.local', 'state'), 'telebot');
@@ -170,7 +175,12 @@ writeEnv(envPath, {
   TELEGRAM_ALLOWED_CHAT_IDS: chatId,
   TELEBOT_ROOT_DIR: root,
   TELEBOT_COMMAND_TIMEOUT_MS: timeout,
-  TELEBOT_MAX_OUTPUT_CHARS: maxOutput
+  TELEBOT_MAX_OUTPUT_CHARS: maxOutput,
+  AI_PROVIDER: aiProvider,
+  OPENAI_API_KEY: openaiApiKey,
+  OPENAI_MODEL: openaiModel,
+  GOOGLE_AI_API_KEY: googleAiApiKey,
+  GEMINI_MODEL: geminiModel
 });
 
 if (os.platform() === 'linux') setupLinux(envPath);
