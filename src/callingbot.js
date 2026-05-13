@@ -24,6 +24,7 @@ export function parseCallCommand(text) {
   const entries = parseKeyValueLines(text);
   const to = entries.to ?? entries.phone ?? entries.number ?? entries['전화번호'] ?? entries['번호'];
   const title = entries.title ?? entries.name ?? entries['제목'] ?? 'telegram-call';
+  const note = entries.note ?? entries.context ?? entries.memo ?? entries['메모'] ?? entries['노트'] ?? entries['맥락'] ?? '';
   const meetingId = entries.meeting ?? entries.meetingid ?? entries['회의번호'] ?? entries['미팅번호'];
   const password = entries.password ?? entries.passcode ?? entries.pin ?? entries['비밀번호'] ?? entries['암호'];
   let digits = entries.digits ?? entries.dtmf ?? entries['입력번호'] ?? entries['누를번호'];
@@ -42,6 +43,7 @@ export function parseCallCommand(text) {
   return {
     to: normalizePhone(to),
     title,
+    note,
     digits: digits ?? ''
   };
 }
@@ -169,6 +171,7 @@ export function callCommandHelp() {
     'meeting=123456789',
     'password=987654',
     'title=251212_FY4Q25 Broadcom',
+    'note=AI 매출, backlog, Q&A를 특히 자세히 정리',
     '',
     'DTMF 전체를 알고 있으면:',
     '/call',
@@ -192,7 +195,8 @@ export function scheduleCallCommandHelp() {
     '/schedule_call',
     'in=10m',
     'to=+821022414700',
-    'title=test-call'
+    'title=test-call',
+    'note=연결 테스트'
   ].join('\n');
 }
 

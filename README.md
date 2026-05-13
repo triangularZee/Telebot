@@ -65,12 +65,14 @@ Examples:
 to=+18005551234
 digits=ww123456789#ww987654#
 title=test-call
+note=AI 매출, backlog, Q&A를 특히 자세히 정리
 /schedule_call
 at=2026-05-13 16:30
 to=+18005551234
 meeting=123456789
 password=987654
 title=scheduled-call
+note=가이던스와 마진 코멘트 위주로 정리
 /scheduled_calls
 /cancel_call call-id
 /ai summarize this repository
