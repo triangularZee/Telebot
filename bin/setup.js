@@ -41,6 +41,14 @@ function escapeSystemdArg(value) {
     .replace(/%/g, '%%')}"`;
 }
 
+function escapeSystemdPath(value) {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/\s/g, '\\x20')
+    .replace(/%/g, '%%')
+    .replace(/\$/g, '$$');
+}
+
 function escapeXml(value) {
   return value
     .replace(/&/g, '&amp;')
@@ -69,8 +77,8 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=${escapeSystemdArg(repoRoot)}
-EnvironmentFile=${escapeSystemdArg(envPath)}
+WorkingDirectory=${escapeSystemdPath(repoRoot)}
+EnvironmentFile=${escapeSystemdPath(envPath)}
 ExecStart=${escapeSystemdArg(nodePath)} ${escapeSystemdArg(path.join(repoRoot, 'src', 'index.js'))}
 Restart=always
 RestartSec=5
