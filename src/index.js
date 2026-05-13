@@ -134,7 +134,12 @@ bot.command('gemini', async (ctx) => {
 });
 
 bot.on('message:text', async (ctx) => {
-  await ctx.reply('Unknown command. Send /help.');
+  const text = ctx.message.text.trim();
+  if (text.startsWith('/')) {
+    await ctx.reply('Unknown command. Send /help.');
+    return;
+  }
+  await handleAi(ctx, config.aiProvider);
 });
 
 bot.catch((error) => {

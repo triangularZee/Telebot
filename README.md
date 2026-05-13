@@ -66,6 +66,7 @@ Examples:
 `/run` executes commands on the machine running Telebot. Keep the bot token private and restrict `TELEGRAM_ALLOWED_CHAT_IDS`.
 `/claude` runs `claude -p` in the current working directory. Claude Code must already be installed and authenticated on the remote machine.
 `/ai` uses `AI_PROVIDER`; `/claude`, `/gpt`, and `/gemini` force a specific provider.
+Plain text messages are also sent to the default `AI_PROVIDER`, so `/claude` is optional when `AI_PROVIDER=claude`.
 
 Provider environment variables:
 
