@@ -28,5 +28,6 @@ export const config = {
   openaiApiKey: process.env.OPENAI_API_KEY ?? '',
   openaiModel: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
   googleAiApiKey: process.env.GOOGLE_AI_API_KEY ?? process.env.GEMINI_API_KEY ?? '',
-  geminiModel: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash'
+  geminiModel: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
+  callingBotBaseUrl: process.env.CALLINGBOT_BASE_URL ?? 'http://localhost:3000'
 };

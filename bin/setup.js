@@ -167,6 +167,7 @@ const openaiApiKey = String(args['openai-api-key'] ?? process.env.OPENAI_API_KEY
 const openaiModel = String(args['openai-model'] ?? process.env.OPENAI_MODEL ?? 'gpt-4o-mini');
 const googleAiApiKey = String(args['google-ai-api-key'] ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GEMINI_API_KEY ?? '');
 const geminiModel = String(args['gemini-model'] ?? process.env.GEMINI_MODEL ?? 'gemini-2.5-flash');
+const callingBotBaseUrl = String(args['callingbot-base-url'] ?? process.env.CALLINGBOT_BASE_URL ?? 'http://localhost:3000');
 const envDir = os.platform() === 'darwin'
   ? path.join(homeDir, 'Library', 'Application Support', 'telebot')
   : path.join(process.env.XDG_STATE_HOME || path.join(homeDir, '.local', 'state'), 'telebot');
@@ -186,7 +187,8 @@ writeEnv(envPath, {
   OPENAI_API_KEY: openaiApiKey,
   OPENAI_MODEL: openaiModel,
   GOOGLE_AI_API_KEY: googleAiApiKey,
-  GEMINI_MODEL: geminiModel
+  GEMINI_MODEL: geminiModel,
+  CALLINGBOT_BASE_URL: callingBotBaseUrl
 });
 
 if (os.platform() === 'linux') setupLinux(envPath);

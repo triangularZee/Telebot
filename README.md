@@ -44,6 +44,7 @@ npm start
 /cd path
 /cat path
 /run command
+/call
 /ai prompt
 /claude prompt
 /gpt prompt
@@ -57,6 +58,10 @@ Examples:
 /cd C:\Users\J\Documents\Codex
 /run git status --short
 /cat README.md
+/call
+to=+18005551234
+digits=ww123456789#ww987654#
+title=test-call
 /ai summarize this repository
 /claude summarize this repository
 /gpt summarize this repository
@@ -79,6 +84,7 @@ OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
 GOOGLE_AI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash
+CALLINGBOT_BASE_URL=http://localhost:3000
 ```
 
 ## Linux Service Install
@@ -102,7 +108,8 @@ npm run setup -- \
   --claude-effort medium \
   --claude-continue true \
   --openai-api-key "$OPENAI_API_KEY" \
-  --google-ai-api-key "$GOOGLE_AI_API_KEY"
+  --google-ai-api-key "$GOOGLE_AI_API_KEY" \
+  --callingbot-base-url "http://localhost:3000"
 ```
 
 This creates:

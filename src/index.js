@@ -2,6 +2,7 @@ import { Bot } from 'grammy';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from './config.js';
+import { callCommandHelp, parseCallCommand, startCallingBotCall } from './callingbot.js';
 import { listDir, readTextFile, resolveFrom, runCommand } from './shell.js';
 import { providerLabel, runProvider } from './providers/index.js';
 
@@ -73,12 +74,14 @@ function helpText() {
     '/cd path',
     '/cat path',
     '/run command',
+    '/call',
     '/ai prompt',
     '/claude prompt',
     '/gpt prompt',
     '/gemini prompt',
     '',
     `Default AI provider: ${providerLabel()}`,
+    `CallingBot API: ${config.callingBotBaseUrl}`,
     'This bot only accepts configured chat IDs.'
   ].join('\n');
 }
@@ -137,6 +140,21 @@ bot.command('run', async (ctx) => {
     await replyLong(ctx, output);
   } catch (error) {
     await ctx.reply(`Error: ${error.message}`);
+  }
+});
+
+bot.command('call', async (ctx) => {
+  try {
+    const job = parseCallCommand(ctx.message?.text ?? '');
+    const result = await startCallingBotCall(job, { chatId: ctx.chat.id });
+    await ctx.reply([
+      'CallingBot call started.',
+      `to: ${job.to}`,
+      `title: ${job.title}`,
+      result.callSid ? `callSid: ${result.callSid}` : JSON.stringify(result)
+    ].join('\n'));
+  } catch (error) {
+    await ctx.reply(`${error.message}\n\n${callCommandHelp()}`);
   }
 });
 
