@@ -72,6 +72,8 @@ Provider environment variables:
 
 ```env
 AI_PROVIDER=claude
+CLAUDE_MODEL=claude-sonnet-4-6
+CLAUDE_EFFORT=medium
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
 GOOGLE_AI_API_KEY=
@@ -95,6 +97,8 @@ npm run setup -- \
   --chat-id "123456789" \
   --root "$HOME" \
   --ai-provider claude \
+  --claude-model claude-sonnet-4-6 \
+  --claude-effort medium \
   --openai-api-key "$OPENAI_API_KEY" \
   --google-ai-api-key "$GOOGLE_AI_API_KEY"
 ```
