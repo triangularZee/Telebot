@@ -2,9 +2,23 @@ import { Bot } from 'grammy';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from './config.js';
-import { callCommandHelp, parseCallCommand, startCallingBotCall } from './callingbot.js';
+import {
+  callCommandHelp,
+  formatKst,
+  parseCallCommand,
+  parseScheduleCallCommand,
+  scheduleCallCommandHelp,
+  startCallingBotCall
+} from './callingbot.js';
 import { listDir, readTextFile, resolveFrom, runCommand } from './shell.js';
 import { providerLabel, runProvider } from './providers/index.js';
+import {
+  addScheduledCall,
+  cancelScheduledCall,
+  formatScheduledCall,
+  listScheduledCalls,
+  startCallScheduler
+} from './scheduler.js';
 
 const bot = new Bot(config.botToken);
 const cwdByChat = new Map();
@@ -75,6 +89,9 @@ function helpText() {
     '/cat path',
     '/run command',
     '/call',
+    '/schedule_call',
+    '/scheduled_calls',
+    '/cancel_call id',
     '/ai prompt',
     '/claude prompt',
     '/gpt prompt',
@@ -158,6 +175,46 @@ bot.command('call', async (ctx) => {
   }
 });
 
+bot.command('schedule_call', async (ctx) => {
+  try {
+    const { job, scheduledAt } = parseScheduleCallCommand(ctx.message?.text ?? '');
+    const item = await addScheduledCall({ chatId: ctx.chat.id, job, scheduledAt });
+    await ctx.reply([
+      'CallingBot call scheduled.',
+      `id: ${item.id}`,
+      `time: ${formatKst(scheduledAt)} KST`,
+      `to: ${job.to}`,
+      `title: ${job.title}`
+    ].join('\n'));
+  } catch (error) {
+    await ctx.reply(`${error.message}\n\n${scheduleCallCommandHelp()}`);
+  }
+});
+
+bot.command('scheduled_calls', async (ctx) => {
+  try {
+    const items = await listScheduledCalls(ctx.chat.id);
+    if (!items.length) {
+      await ctx.reply('No scheduled calls.');
+      return;
+    }
+    await replyLong(ctx, items.map(formatScheduledCall).join('\n\n'));
+  } catch (error) {
+    await ctx.reply(`Error: ${error.message}`);
+  }
+});
+
+bot.command('cancel_call', async (ctx) => {
+  try {
+    const id = argText(ctx);
+    if (!id) throw new Error('Usage: /cancel_call id');
+    const cancelled = await cancelScheduledCall(ctx.chat.id, id);
+    await ctx.reply(cancelled ? `Cancelled: ${id}` : `No scheduled call found: ${id}`);
+  } catch (error) {
+    await ctx.reply(`Error: ${error.message}`);
+  }
+});
+
 async function handleAi(ctx, provider) {
   let progress = null;
   try {
@@ -203,5 +260,6 @@ bot.catch((error) => {
   console.error('Telegram bot error:', error);
 });
 
+startCallScheduler(bot, startCallingBotCall);
 bot.start();
 console.log(`Telebot started. root=${config.rootDir}`);

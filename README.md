@@ -45,6 +45,9 @@ npm start
 /cat path
 /run command
 /call
+/schedule_call
+/scheduled_calls
+/cancel_call id
 /ai prompt
 /claude prompt
 /gpt prompt
@@ -62,6 +65,14 @@ Examples:
 to=+18005551234
 digits=ww123456789#ww987654#
 title=test-call
+/schedule_call
+at=2026-05-13 16:30
+to=+18005551234
+meeting=123456789
+password=987654
+title=scheduled-call
+/scheduled_calls
+/cancel_call call-id
 /ai summarize this repository
 /claude summarize this repository
 /gpt summarize this repository

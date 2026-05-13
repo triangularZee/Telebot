@@ -8,7 +8,7 @@ function normalizePhone(value) {
   return cleaned;
 }
 
-function parseKeyValueLines(text) {
+export function parseKeyValueLines(text) {
   const entries = {};
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
@@ -26,7 +26,7 @@ export function parseCallCommand(text) {
   const title = entries.title ?? entries.name ?? entries['제목'] ?? 'telegram-call';
   const meetingId = entries.meeting ?? entries.meetingid ?? entries['회의번호'] ?? entries['미팅번호'];
   const password = entries.password ?? entries.passcode ?? entries.pin ?? entries['비밀번호'] ?? entries['암호'];
-  let digits = entries.digits ?? entries.dtmf ?? entries['누를번호'];
+  let digits = entries.digits ?? entries.dtmf ?? entries['입력번호'] ?? entries['누를번호'];
 
   if (!digits && meetingId) {
     digits = `ww${meetingId.replace(/\s+/g, '')}#`;
@@ -46,6 +46,121 @@ export function parseCallCommand(text) {
   };
 }
 
+function kstParts(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const parts = Object.fromEntries(formatter.formatToParts(date).map((part) => [part.type, part.value]));
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    minute: Number(parts.minute)
+  };
+}
+
+function kstToDate({ year, month, day, hour, minute }) {
+  return new Date(Date.UTC(year, month - 1, day, hour - 9, minute, 0, 0));
+}
+
+function parseRelativeTime(value) {
+  const match = String(value).trim().match(/^(\d+)\s*(m|min|minute|minutes|분|h|hr|hour|hours|시간|d|day|days|일)?$/i);
+  if (!match) return null;
+
+  const amount = Number(match[1]);
+  const unit = (match[2] ?? 'm').toLowerCase();
+  const multiplier = unit.startsWith('h') || unit === '시간'
+    ? 60 * 60 * 1000
+    : unit.startsWith('d') || unit === '일'
+      ? 24 * 60 * 60 * 1000
+      : 60 * 1000;
+
+  return new Date(Date.now() + amount * multiplier);
+}
+
+export function parseScheduleTime(entries) {
+  const relative = entries.in ?? entries.after ?? entries['후'];
+  if (relative) {
+    const scheduledAt = parseRelativeTime(relative);
+    if (!scheduledAt) throw new Error('예약 시간을 해석하지 못했습니다. 예: in=10m 또는 in=2h');
+    return scheduledAt;
+  }
+
+  const raw = entries.at ?? entries.time ?? entries.datetime ?? entries['예약'] ?? entries['시간'];
+  if (!raw) {
+    throw new Error('예약 시간이 필요합니다. 예: at=2026-05-13 16:30 또는 in=10m');
+  }
+
+  const value = String(raw).trim();
+  const nowKst = kstParts();
+  let year = nowKst.year;
+  let month = nowKst.month;
+  let day = nowKst.day;
+  let hour;
+  let minute;
+  let match = value.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\s+(\d{1,2}):(\d{2})$/);
+
+  if (match) {
+    year = Number(match[1]);
+    month = Number(match[2]);
+    day = Number(match[3]);
+    hour = Number(match[4]);
+    minute = Number(match[5]);
+  } else if ((match = value.match(/^(\d{1,2})[-/.](\d{1,2})\s+(\d{1,2}):(\d{2})$/))) {
+    month = Number(match[1]);
+    day = Number(match[2]);
+    hour = Number(match[3]);
+    minute = Number(match[4]);
+  } else if ((match = value.match(/^(\d{1,2}):(\d{2})$/))) {
+    hour = Number(match[1]);
+    minute = Number(match[2]);
+  } else {
+    throw new Error('예약 시간 형식이 맞지 않습니다. 예: at=2026-05-13 16:30, at=16:30, in=10m');
+  }
+
+  if (hour > 23 || minute > 59 || month < 1 || month > 12 || day < 1 || day > 31) {
+    throw new Error('예약 시간 값이 올바르지 않습니다.');
+  }
+
+  let scheduledAt = kstToDate({ year, month, day, hour, minute });
+  if (/^\d{1,2}:\d{2}$/.test(value) && scheduledAt.getTime() <= Date.now()) {
+    scheduledAt = new Date(scheduledAt.getTime() + 24 * 60 * 60 * 1000);
+  }
+  if (scheduledAt.getTime() <= Date.now()) {
+    throw new Error('예약 시간은 현재보다 미래여야 합니다.');
+  }
+
+  return scheduledAt;
+}
+
+export function parseScheduleCallCommand(text) {
+  const entries = parseKeyValueLines(text);
+  const scheduledAt = parseScheduleTime(entries);
+  return {
+    job: parseCallCommand(text),
+    scheduledAt
+  };
+}
+
+export function formatKst(date) {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(date);
+}
+
 export function callCommandHelp() {
   return [
     '사용법:',
@@ -55,11 +170,29 @@ export function callCommandHelp() {
     'password=987654',
     'title=251212_FY4Q25 Broadcom',
     '',
-    '이미 DTMF 전체를 알고 있으면:',
+    'DTMF 전체를 알고 있으면:',
     '/call',
     'to=+18005551234',
     'digits=ww123456789#ww987654#',
     'title=board-call'
+  ].join('\n');
+}
+
+export function scheduleCallCommandHelp() {
+  return [
+    '사용법:',
+    '/schedule_call',
+    'at=2026-05-13 16:30',
+    'to=+18005551234',
+    'meeting=123456789',
+    'password=987654',
+    'title=251212_FY4Q25 Broadcom',
+    '',
+    '상대 시간도 가능합니다:',
+    '/schedule_call',
+    'in=10m',
+    'to=+821022414700',
+    'title=test-call'
   ].join('\n');
 }
 

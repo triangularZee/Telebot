@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,6 +20,7 @@ export const config = {
     .map((id) => id.trim())
     .filter(Boolean),
   rootDir: path.resolve(repoRoot, process.env.TELEBOT_ROOT_DIR ?? '.'),
+  stateDir: path.resolve(process.env.TELEBOT_STATE_DIR ?? path.join(os.homedir(), '.local', 'state', 'telebot')),
   commandTimeoutMs: Number(process.env.TELEBOT_COMMAND_TIMEOUT_MS ?? 60000),
   maxOutputChars: Number(process.env.TELEBOT_MAX_OUTPUT_CHARS ?? 3500),
   aiProvider: process.env.AI_PROVIDER ?? 'claude',
