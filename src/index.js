@@ -52,12 +52,14 @@ async function startProgress(ctx, label) {
   return {
     stop: async (finalText = null) => {
       clearInterval(timer);
-      if (finalText) {
-        try {
+      try {
+        if (finalText) {
           await ctx.api.editMessageText(ctx.chat.id, message.message_id, finalText);
-        } catch {
-          await ctx.reply(finalText);
+          return;
         }
+        await ctx.api.deleteMessage(ctx.chat.id, message.message_id);
+      } catch {
+        if (finalText) await ctx.reply(finalText);
       }
     }
   };
