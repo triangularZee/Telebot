@@ -44,6 +44,7 @@ npm start
 /cd path
 /cat path
 /run command
+/claude prompt
 ```
 
 Examples:
@@ -53,9 +54,11 @@ Examples:
 /cd C:\Users\J\Documents\Codex
 /run git status --short
 /cat README.md
+/claude summarize this repository
 ```
 
 `/run` executes commands on the machine running Telebot. Keep the bot token private and restrict `TELEGRAM_ALLOWED_CHAT_IDS`.
+`/claude` runs `claude -p` in the current working directory. Claude Code must already be installed and authenticated on the remote machine.
 
 ## Linux Service Install
 
@@ -114,4 +117,5 @@ It creates:
 - Use a dedicated bot token.
 - Set `TELEGRAM_ALLOWED_CHAT_IDS`; leaving it empty is refused.
 - Treat `/run` as full remote shell access.
+- Treat `/claude` as remote AI-agent access to the current directory.
 - Rotate the token in BotFather if it has been shared with another service.

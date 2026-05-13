@@ -36,6 +36,7 @@ function helpText() {
     '/cd path',
     '/cat path',
     '/run command',
+    '/claude prompt',
     '',
     'This bot only accepts configured chat IDs.'
   ].join('\n');
@@ -92,6 +93,21 @@ bot.command('cat', async (ctx) => {
 bot.command('run', async (ctx) => {
   try {
     const output = await runCommand(cwdFor(ctx), argText(ctx));
+    await replyLong(ctx, output);
+  } catch (error) {
+    await ctx.reply(`Error: ${error.message}`);
+  }
+});
+
+bot.command('claude', async (ctx) => {
+  try {
+    const prompt = argText(ctx);
+    if (!prompt) throw new Error('Usage: /claude prompt');
+    await ctx.reply('Claude is thinking...');
+    const output = await runCommand(
+      cwdFor(ctx),
+      `claude -p --permission-mode default --max-budget-usd 1 ${JSON.stringify(prompt)}`
+    );
     await replyLong(ctx, output);
   } catch (error) {
     await ctx.reply(`Error: ${error.message}`);
