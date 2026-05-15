@@ -28,7 +28,7 @@ export function parseCallCommand(text) {
   const silenceTimeout = entries.silencetimeout ?? entries.silence ?? entries.timeout ?? entries['무음종료'] ?? '120';
   const meetingId = entries.meeting ?? entries.meetingid ?? entries['회의번호'] ?? entries['미팅번호'];
   const password = entries.password ?? entries.passcode ?? entries.pin ?? entries['비밀번호'] ?? entries['암호'];
-  let digits = entries.digits ?? entries.dtmf ?? entries['입력번호'] ?? entries['누를번호'];
+  let digits = entries.digits ?? entries.digit ?? entries.dtmf ?? entries['입력번호'] ?? entries['누를번호'];
 
   if (!digits && meetingId) {
     digits = `ww${meetingId.replace(/\s+/g, '')}#`;
@@ -179,7 +179,7 @@ export function callCommandHelp() {
     'DTMF 전체를 알고 있으면:',
     '/call',
     'to=+18005551234',
-    'digits=ww123456789#ww987654#',
+    'digits=wwww123456789#ww987654#',
     'title=board-call'
   ].join('\n');
 }
