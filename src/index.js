@@ -156,7 +156,7 @@ async function handleCallFormMessage(ctx) {
       form.step = 'code1';
     } else if (form.step === 'code1') {
       if (!skipped) form.data.code1 = text;
-      form.step = 'code2';
+      form.step = skipped ? 'title' : 'code2';
     } else if (form.step === 'code2') {
       if (!skipped) form.data.code2 = text;
       form.step = 'title';
