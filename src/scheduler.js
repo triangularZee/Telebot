@@ -59,7 +59,7 @@ export function formatScheduledCall(item) {
     `id: ${item.id}`,
     `time: ${formatKst(new Date(item.scheduledAt))} KST`,
     `call starts: ${formatKst(new Date(item.runAt ?? item.scheduledAt))} KST`,
-    `to: ${item.job.to}`,
+    item.job.kind === 'zoom' ? `url: ${item.job.joinUrl}` : `to: ${item.job.to}`,
     `title: ${item.job.title}`
   ].join('\n');
 }
@@ -93,13 +93,13 @@ export function startCallScheduler(bot, runner) {
             'Scheduled call starting.',
             `time: ${formatKst(new Date(item.scheduledAt))} KST`,
             `call starts: ${formatKst(new Date(item.runAt ?? item.scheduledAt))} KST`,
-            `to: ${item.job.to}`,
+            item.job.kind === 'zoom' ? `url: ${item.job.joinUrl}` : `to: ${item.job.to}`,
             `title: ${item.job.title}`
           ].join('\n'));
           const result = await runner(item.job, { chatId: item.chatId });
           await bot.api.sendMessage(item.chatId, [
-            'CallingBot call started.',
-            `to: ${item.job.to}`,
+            item.job.kind === 'zoom' ? 'Zoom link bot started.' : 'CallingBot call started.',
+            item.job.kind === 'zoom' ? `url: ${item.job.joinUrl}` : `to: ${item.job.to}`,
             `title: ${item.job.title}`,
             result.callSid ? `callSid: ${result.callSid}` : JSON.stringify(result)
           ].join('\n'));

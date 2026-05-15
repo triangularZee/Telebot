@@ -13,7 +13,8 @@ import {
   parseScheduleCallCommand,
   parseScheduleTime,
   scheduleCallCommandHelp,
-  startCallingBotCall
+  startCallingBotCall,
+  startCallingBotZoom
 } from './callingbot.js';
 import { listDir, readTextFile, resolveFrom, runCommand } from './shell.js';
 import { providerLabel, runProvider } from './providers/index.js';
@@ -49,7 +50,7 @@ function skipKeyboard() {
 }
 
 function callTypeKeyboard() {
-  return new Keyboard().text('1. Zoom dial-in').text('2. 일반 전화').text('/cancel').resized().oneTime();
+  return new Keyboard().text('1. Zoom link').text('2. Zoom dial-in').text('3. 일반 전화').text('/cancel').resized().oneTime();
 }
 
 function removeKeyboard() {
@@ -60,8 +61,13 @@ async function promptCallForm(ctx, form) {
   const prompts = {
     type: [
       '통화 유형을 선택해주세요.',
-      '1. Zoom dial-in: Zoom 전화 접속 번호로 입장',
-      '2. 일반 전화: 일반 컨퍼런스콜/ARS'
+      '1. Zoom link: Zoom 링크로 브라우저 입장',
+      '2. Zoom dial-in: Zoom 전화 접속 번호로 입장',
+      '3. 일반 전화: 일반 컨퍼런스콜/ARS'
+    ].join('\n'),
+    zoomUrl: [
+      'Zoom 접속 링크를 입력해주세요.',
+      '예: https://us06web.zoom.us/j/5025081684?pwd=...'
     ].join('\n'),
     to: form.data.type === 'zoom'
       ? [
@@ -108,6 +114,10 @@ async function promptCallForm(ctx, form) {
   }
 
   const required = form.step === 'meetingId' || (form.step === 'to' && form.data.type !== 'zoom');
+  if (form.step === 'zoomUrl') {
+    await ctx.reply(prompts[form.step]);
+    return;
+  }
   await ctx.reply(prompts[form.step], required ? undefined : { reply_markup: skipKeyboard() });
 }
 
@@ -150,6 +160,39 @@ function buildZoomDigits({ meetingId = '', passcode = '' } = {}) {
 async function finishCallForm(ctx, form) {
   const data = form.data;
   const isZoom = data.type === 'zoom';
+  const isZoomLink = data.type === 'zoom_link';
+  if (isZoomLink) {
+    const job = {
+      kind: 'zoom',
+      joinUrl: data.zoomUrl,
+      title: data.title || 'zoom-meeting',
+      note: '',
+      maxMinutes: 120
+    };
+
+    if (data.scheduledAt) {
+      const scheduledAt = parseScheduleTime(scheduleEntriesFromInput(data.scheduledAt));
+      const item = await addScheduledCall({ chatId: ctx.chat.id, job, scheduledAt });
+      await ctx.reply([
+        'Zoom link bot scheduled.',
+        `id: ${item.id}`,
+        `time: ${formatKst(scheduledAt)} KST`,
+        `url: ${job.joinUrl}`,
+        `title: ${job.title}`
+      ].join('\n'), { reply_markup: removeKeyboard() });
+      return;
+    }
+
+    const result = await startCallingBotZoom(job, { chatId: ctx.chat.id });
+    await ctx.reply([
+      'Zoom link bot started.',
+      `url: ${job.joinUrl}`,
+      `title: ${job.title}`,
+      JSON.stringify(result)
+    ].join('\n'), { reply_markup: removeKeyboard() });
+    return;
+  }
+
   const job = {
     to: normalizePhone(data.to),
     title: data.title || 'telegram-call',
@@ -204,14 +247,20 @@ async function handleCallFormMessage(ctx) {
   const skipped = lower === '/skip';
   try {
     if (form.step === 'type') {
-      if (['1', '1.', '1. zoom dial-in', 'zoom dial-in', 'zoom', '/zoom'].includes(lower)) {
+      if (['1', '1.', '1. zoom link', 'zoom link', 'link', '/zoomlink'].includes(lower)) {
+        form.data.type = 'zoom_link';
+      } else if (['2', '2.', '2. zoom dial-in', 'zoom dial-in', 'zoom', '/zoom'].includes(lower)) {
         form.data.type = 'zoom';
-      } else if (['2', '2.', '2. 일반 전화', '일반 전화', 'phone', '/phone'].includes(lower)) {
+      } else if (['3', '3.', '3. 일반 전화', '일반 전화', 'phone', '/phone'].includes(lower)) {
         form.data.type = 'phone';
       } else {
-        throw new Error('통화 유형은 1. Zoom dial-in 또는 2. 일반 전화 중 하나를 선택해주세요.');
+        throw new Error('통화 유형은 1. Zoom link, 2. Zoom dial-in, 3. 일반 전화 중 하나를 선택해주세요.');
       }
-      form.step = 'to';
+      form.step = form.data.type === 'zoom_link' ? 'zoomUrl' : 'to';
+    } else if (form.step === 'zoomUrl') {
+      if (!text || skipped) throw new Error('Zoom 접속 링크는 필수입니다.');
+      form.data.zoomUrl = text;
+      form.step = 'scheduledAt';
     } else if (form.step === 'to') {
       if (form.data.type === 'zoom' && skipped) {
         form.data.to = DEFAULT_ZOOM_DIAL_IN;
@@ -499,6 +548,8 @@ bot.catch((error) => {
   console.error('Telegram bot error:', error);
 });
 
-startCallScheduler(bot, startCallingBotCall);
+startCallScheduler(bot, (job, options) => (
+  job.kind === 'zoom' ? startCallingBotZoom(job, options) : startCallingBotCall(job, options)
+));
 bot.start();
 console.log(`Telebot started. root=${config.rootDir}`);

@@ -275,6 +275,32 @@ export async function startCallingBotCall(job, { chatId } = {}) {
   return body;
 }
 
+export async function startCallingBotZoom(job, { chatId } = {}) {
+  const baseUrl = config.callingBotBaseUrl.replace(/\/$/, '');
+  const response = await fetch(`${baseUrl}/api/zoom`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ...job,
+      notifyChatId: chatId ? String(chatId) : ''
+    })
+  });
+
+  const text = await response.text();
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    body = { raw: text };
+  }
+
+  if (!response.ok) {
+    throw new Error(body.error ?? `CallingBot Zoom API failed: ${response.status}`);
+  }
+
+  return body;
+}
+
 export async function hangupCallingBotCall(callSid = '') {
   const baseUrl = config.callingBotBaseUrl.replace(/\/$/, '');
   const response = await fetch(`${baseUrl}/api/hangup`, {
