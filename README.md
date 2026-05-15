@@ -45,6 +45,7 @@ npm start
 /cat path
 /run command
 /call
+/hangup [callSid]
 /schedule_call
 /scheduled_calls
 /cancel_call id
@@ -67,6 +68,7 @@ digits=ww123456789#ww987654#
 title=test-call
 note=AI 매출, backlog, Q&A를 특히 자세히 정리
 silenceTimeout=120
+/hangup
 /schedule_call
 at=2026-05-13 16:30
 to=+18005551234

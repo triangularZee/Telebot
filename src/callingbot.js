@@ -228,3 +228,26 @@ export async function startCallingBotCall(job, { chatId } = {}) {
 
   return body;
 }
+
+export async function hangupCallingBotCall(callSid = '') {
+  const baseUrl = config.callingBotBaseUrl.replace(/\/$/, '');
+  const response = await fetch(`${baseUrl}/api/hangup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ callSid })
+  });
+
+  const text = await response.text();
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    body = { raw: text };
+  }
+
+  if (!response.ok) {
+    throw new Error(body.error ?? `CallingBot hangup failed: ${response.status}`);
+  }
+
+  return body;
+}

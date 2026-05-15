@@ -5,6 +5,7 @@ import { config } from './config.js';
 import {
   callCommandHelp,
   formatKst,
+  hangupCallingBotCall,
   parseCallCommand,
   parseScheduleCallCommand,
   scheduleCallCommandHelp,
@@ -89,6 +90,7 @@ function helpText() {
     '/cat path',
     '/run command',
     '/call',
+    '/hangup [callSid]',
     '/schedule_call',
     '/scheduled_calls',
     '/cancel_call id',
@@ -172,6 +174,24 @@ bot.command('call', async (ctx) => {
     ].join('\n'));
   } catch (error) {
     await ctx.reply(`${error.message}\n\n${callCommandHelp()}`);
+  }
+});
+
+bot.command('hangup', async (ctx) => {
+  try {
+    const callSid = argText(ctx);
+    const result = await hangupCallingBotCall(callSid);
+    if (!result.count) {
+      await ctx.reply('No active CallingBot calls found.');
+      return;
+    }
+    await ctx.reply([
+      'CallingBot call hangup requested.',
+      `count: ${result.count}`,
+      ...result.calls.map((call) => `${call.sid}: ${call.status}`)
+    ].join('\n'));
+  } catch (error) {
+    await ctx.reply(`Error: ${error.message}`);
   }
 });
 
