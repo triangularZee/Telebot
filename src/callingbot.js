@@ -1,6 +1,6 @@
 import { config } from './config.js';
 
-function normalizePhone(value) {
+export function normalizePhone(value) {
   const cleaned = String(value).replace(/[^\d+]/g, '');
   if (cleaned.startsWith('+')) return cleaned;
   if (cleaned.startsWith('010')) return `+82${cleaned.slice(1)}`;
@@ -20,21 +20,33 @@ export function parseKeyValueLines(text) {
   return entries;
 }
 
+export function normalizeDialCode(value = '') {
+  const code = String(value).trim().replace(/\s+/g, '');
+  if (!code) return '';
+  return code.startsWith('ww') ? code : `ww${code}`;
+}
+
+export function buildDigitsFromCodes({ code1 = '', code2 = '' } = {}) {
+  return [normalizeDialCode(code1), normalizeDialCode(code2)].filter(Boolean).join('');
+}
+
 export function parseCallCommand(text) {
   const entries = parseKeyValueLines(text);
   const to = entries.to ?? entries.phone ?? entries.number ?? entries['전화번호'] ?? entries['번호'];
   const title = entries.title ?? entries.name ?? entries['제목'] ?? 'telegram-call';
-  const note = entries.note ?? entries.context ?? entries.memo ?? entries['메모'] ?? entries['노트'] ?? entries['맥락'] ?? '';
+  const note = entries.note ?? entries.context ?? entries.memo ?? entries['메모'] ?? entries['노트'] ?? '';
   const silenceTimeout = entries.silencetimeout ?? entries.silence ?? entries.timeout ?? entries['무음종료'] ?? '120';
   const meetingId = entries.meeting ?? entries.meetingid ?? entries['회의번호'] ?? entries['미팅번호'];
   const password = entries.password ?? entries.passcode ?? entries.pin ?? entries['비밀번호'] ?? entries['암호'];
-  let digits = entries.digits ?? entries.digit ?? entries.dtmf ?? entries['입력번호'] ?? entries['누를번호'];
+  const code1 = entries.code1 ?? entries['입력코드1'];
+  const code2 = entries.code2 ?? entries['입력코드2'];
+  let digits = entries.digits ?? entries.digit ?? entries.dtmf ?? entries['입력번호'] ?? entries['입력코드'];
 
-  if (!digits && meetingId) {
+  if (!digits && (code1 || code2)) {
+    digits = buildDigitsFromCodes({ code1, code2 });
+  } else if (!digits && meetingId) {
     digits = `ww${meetingId.replace(/\s+/g, '')}#`;
-    if (password) {
-      digits += `ww${password.replace(/\s+/g, '')}#`;
-    }
+    if (password) digits += `ww${password.replace(/\s+/g, '')}#`;
   }
 
   if (!to) {
@@ -75,7 +87,7 @@ function kstToDate({ year, month, day, hour, minute }) {
 }
 
 function parseRelativeTime(value) {
-  const match = String(value).trim().match(/^(\d+)\s*(m|min|minute|minutes|분|h|hr|hour|hours|시간|d|day|days|일)?$/i);
+  const match = String(value).trim().match(/^(\d+)\s*(m|min|minute|minutes|분|h|hr|hour|hours|시간|d|day|days|일)$/i);
   if (!match) return null;
 
   const amount = Number(match[1]);
@@ -97,7 +109,7 @@ export function parseScheduleTime(entries) {
     return scheduledAt;
   }
 
-  const raw = entries.at ?? entries.time ?? entries.datetime ?? entries['예약'] ?? entries['시간'];
+  const raw = entries.at ?? entries.time ?? entries.datetime ?? entries['예약'] ?? entries['예약일시'] ?? entries['시간'];
   if (!raw) {
     throw new Error('예약 시간이 필요합니다. 예: at=2026-05-13 16:30 또는 in=10m');
   }
@@ -168,15 +180,19 @@ export function formatKst(date) {
 export function callCommandHelp() {
   return [
     '사용법:',
+    '/call 을 보내면 단계별 입력 화면이 시작됩니다.',
+    '',
+    '붙여넣기 방식도 가능합니다:',
     '/call',
     'to=+18005551234',
-    'meeting=123456789',
-    'password=987654',
+    'code1=123456789#',
+    'code2=987654#',
     'title=251212_FY4Q25 Broadcom',
-    'note=AI 매출, backlog, Q&A를 특히 자세히 정리',
+    'at=2026-05-15 16:30',
     'silenceTimeout=120',
     '',
-    'DTMF 전체를 알고 있으면:',
+    'code1/code2는 자동으로 ww가 앞에 붙습니다.',
+    '이미 DTMF 전체를 알고 있으면:',
     '/call',
     'to=+18005551234',
     'digits=wwww123456789#ww987654#',
@@ -190,8 +206,8 @@ export function scheduleCallCommandHelp() {
     '/schedule_call',
     'at=2026-05-13 16:30',
     'to=+18005551234',
-    'meeting=123456789',
-    'password=987654',
+    'code1=123456789#',
+    'code2=987654#',
     'title=251212_FY4Q25 Broadcom',
     '',
     '상대 시간도 가능합니다:',

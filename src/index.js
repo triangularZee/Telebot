@@ -1,13 +1,17 @@
-import { Bot } from 'grammy';
+import { Bot, Keyboard } from 'grammy';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from './config.js';
 import {
   callCommandHelp,
+  buildDigitsFromCodes,
   formatKst,
   hangupCallingBotCall,
+  normalizePhone,
   parseCallCommand,
+  parseKeyValueLines,
   parseScheduleCallCommand,
+  parseScheduleTime,
   scheduleCallCommandHelp,
   startCallingBotCall
 } from './callingbot.js';
@@ -23,6 +27,7 @@ import {
 
 const bot = new Bot(config.botToken);
 const cwdByChat = new Map();
+const callForms = new Map();
 
 function isAllowed(ctx) {
   return config.allowedChatIds.includes(String(ctx.chat?.id));
@@ -36,6 +41,141 @@ function cwdFor(ctx) {
 
 function argText(ctx) {
   return (ctx.message?.text ?? '').replace(/^\/\S+\s*/, '').trim();
+}
+
+function skipKeyboard() {
+  return new Keyboard().text('/skip').text('/cancel').resized().oneTime();
+}
+
+function removeKeyboard() {
+  return { remove_keyboard: true };
+}
+
+async function promptCallForm(ctx, form) {
+  const prompts = {
+    to: [
+      '전화번호를 입력해주세요.',
+      '예: +821022414700 또는 01022414700'
+    ].join('\n'),
+    code1: [
+      '입력코드1을 입력해주세요. 선택 항목입니다.',
+      '입력하면 자동으로 앞에 ww가 붙습니다.',
+      '예: 572648# → ww572648#',
+      '없으면 /skip'
+    ].join('\n'),
+    code2: [
+      '입력코드2를 입력해주세요. 선택 항목입니다.',
+      '입력하면 자동으로 앞에 ww가 붙습니다.',
+      '없으면 /skip'
+    ].join('\n'),
+    title: [
+      '제목을 입력해주세요.',
+      '예: 251212_FY4Q25 Broadcom',
+      '기본값을 쓰려면 /skip'
+    ].join('\n'),
+    scheduledAt: [
+      '예약일시를 입력해주세요. 선택 항목입니다.',
+      '예: 2026-05-15 16:30, 05-15 16:30, 16:30, in=10m',
+      '바로 전화하려면 /skip'
+    ].join('\n')
+  };
+
+  const optional = form.step !== 'to';
+  await ctx.reply(prompts[form.step], optional ? { reply_markup: skipKeyboard() } : undefined);
+}
+
+async function startCallForm(ctx) {
+  const chatId = String(ctx.chat.id);
+  const form = { step: 'to', data: {} };
+  callForms.set(chatId, form);
+  await ctx.reply('CallingBot call setup을 시작합니다. 중간에 취소하려면 /cancel 을 보내주세요.');
+  await promptCallForm(ctx, form);
+}
+
+function scheduleEntriesFromInput(value) {
+  const text = String(value).trim();
+  if (/^\w+\s*=/.test(text)) return parseKeyValueLines(text);
+  if (/^\d+\s*(m|min|minute|minutes|분|h|hr|hour|hours|시간|d|day|days|일)$/i.test(text)) {
+    return { in: text };
+  }
+  return { at: text };
+}
+
+async function finishCallForm(ctx, form) {
+  const data = form.data;
+  const job = {
+    to: normalizePhone(data.to),
+    title: data.title || 'telegram-call',
+    note: '',
+    silenceTimeout: 120,
+    digits: buildDigitsFromCodes({ code1: data.code1, code2: data.code2 })
+  };
+
+  if (data.scheduledAt) {
+    const scheduledAt = parseScheduleTime(scheduleEntriesFromInput(data.scheduledAt));
+    const item = await addScheduledCall({ chatId: ctx.chat.id, job, scheduledAt });
+    await ctx.reply([
+      'CallingBot call scheduled.',
+      `id: ${item.id}`,
+      `time: ${formatKst(scheduledAt)} KST`,
+      `to: ${job.to}`,
+      `digits: ${job.digits || '(none)'}`,
+      `title: ${job.title}`
+    ].join('\n'), { reply_markup: removeKeyboard() });
+    return;
+  }
+
+  const result = await startCallingBotCall(job, { chatId: ctx.chat.id });
+  await ctx.reply([
+    'CallingBot call started.',
+    `to: ${job.to}`,
+    `digits: ${job.digits || '(none)'}`,
+    `title: ${job.title}`,
+    result.callSid ? `callSid: ${result.callSid}` : JSON.stringify(result)
+  ].join('\n'), { reply_markup: removeKeyboard() });
+}
+
+async function handleCallFormMessage(ctx) {
+  const chatId = String(ctx.chat.id);
+  const form = callForms.get(chatId);
+  if (!form) return false;
+
+  const text = ctx.message.text.trim();
+  const lower = text.toLowerCase();
+  if (lower === '/cancel') {
+    callForms.delete(chatId);
+    await ctx.reply('CallingBot call setup cancelled.', { reply_markup: removeKeyboard() });
+    return true;
+  }
+
+  const skipped = lower === '/skip';
+  try {
+    if (form.step === 'to') {
+      if (skipped || !text) throw new Error('전화번호는 필수입니다.');
+      form.data.to = text;
+      form.step = 'code1';
+    } else if (form.step === 'code1') {
+      if (!skipped) form.data.code1 = text;
+      form.step = 'code2';
+    } else if (form.step === 'code2') {
+      if (!skipped) form.data.code2 = text;
+      form.step = 'title';
+    } else if (form.step === 'title') {
+      if (!skipped) form.data.title = text;
+      form.step = 'scheduledAt';
+    } else if (form.step === 'scheduledAt') {
+      if (!skipped) form.data.scheduledAt = text;
+      callForms.delete(chatId);
+      await finishCallForm(ctx, form);
+      return true;
+    }
+
+    await promptCallForm(ctx, form);
+  } catch (error) {
+    await ctx.reply(`Error: ${error.message}`);
+    await promptCallForm(ctx, form);
+  }
+  return true;
 }
 
 async function replyLong(ctx, text) {
@@ -164,6 +304,10 @@ bot.command('run', async (ctx) => {
 
 bot.command('call', async (ctx) => {
   try {
+    if (!argText(ctx)) {
+      await startCallForm(ctx);
+      return;
+    }
     const job = parseCallCommand(ctx.message?.text ?? '');
     const result = await startCallingBotCall(job, { chatId: ctx.chat.id });
     await ctx.reply([
@@ -268,6 +412,8 @@ bot.command('gemini', async (ctx) => {
 });
 
 bot.on('message:text', async (ctx) => {
+  if (await handleCallFormMessage(ctx)) return;
+
   const text = ctx.message.text.trim();
   if (text.startsWith('/')) {
     await ctx.reply('Unknown command. Send /help.');
