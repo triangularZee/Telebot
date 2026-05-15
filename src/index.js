@@ -68,6 +68,11 @@ async function promptCallForm(ctx, form) {
       'Zoom 접속 링크를 입력해주세요.',
       '예: https://us06web.zoom.us/j/5025081684?pwd=...'
     ].join('\n'),
+    zoomBotName: [
+      'Zoom 참가 닉네임을 입력해주세요. 선택 항목입니다.',
+      '예: AI Notes Bot, Market Review Bot',
+      '기본값을 쓰려면 /skip'
+    ].join('\n'),
     to: form.data.type === 'zoom'
       ? [
         'Zoom dial-in 전화번호를 입력해주세요. 선택 항목입니다.',
@@ -169,6 +174,7 @@ async function finishCallForm(ctx, form) {
     const job = {
       kind: 'zoom',
       joinUrl: data.zoomUrl,
+      botName: data.zoomBotName,
       title: data.title || 'zoom-meeting',
       note: '',
       maxMinutes: 120
@@ -182,6 +188,7 @@ async function finishCallForm(ctx, form) {
         `id: ${item.id}`,
         `time: ${formatKst(scheduledAt)} KST`,
         `url: ${job.joinUrl}`,
+        `nickname: ${job.botName || '(default)'}`,
         `title: ${job.title}`
       ].join('\n'), { reply_markup: removeKeyboard() });
       return;
@@ -191,6 +198,7 @@ async function finishCallForm(ctx, form) {
     await ctx.reply([
       'Zoom link bot started.',
       `url: ${job.joinUrl}`,
+      `nickname: ${job.botName || '(default)'}`,
       `title: ${job.title}`,
       JSON.stringify(result)
     ].join('\n'), { reply_markup: removeKeyboard() });
@@ -262,6 +270,9 @@ async function handleCallFormMessage(ctx) {
     } else if (form.step === 'zoomUrl') {
       if (!text || skipped) throw new Error('Zoom 접속 링크는 필수입니다.');
       form.data.zoomUrl = extractFirstUrl(text);
+      form.step = 'zoomBotName';
+    } else if (form.step === 'zoomBotName') {
+      if (!skipped) form.data.zoomBotName = text.slice(0, 80);
       form.step = 'scheduledAt';
     } else if (form.step === 'to') {
       if (form.data.type === 'zoom' && skipped) {
