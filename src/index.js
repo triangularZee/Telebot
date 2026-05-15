@@ -28,7 +28,7 @@ import {
 const bot = new Bot(config.botToken);
 const cwdByChat = new Map();
 const callForms = new Map();
-const DEFAULT_ZOOM_DIAL_IN = '+16694449171';
+const DEFAULT_ZOOM_DIAL_IN = '+82231439612';
 
 function isAllowed(ctx) {
   return config.allowedChatIds.includes(String(ctx.chat?.id));

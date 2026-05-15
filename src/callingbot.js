@@ -1,6 +1,6 @@
 import { config } from './config.js';
 
-const DEFAULT_ZOOM_DIAL_IN = '+16694449171';
+const DEFAULT_ZOOM_DIAL_IN = '+82231439612';
 
 export function normalizePhone(value) {
   const cleaned = String(value).replace(/[^\d+]/g, '');
@@ -210,7 +210,7 @@ export function callCommandHelp() {
     'Zoom dial-in 붙여넣기:',
     '/call',
     'type=zoom',
-    'to=+16694449171  # 생략하면 기본값 사용',
+    'to=+82231439612  # 생략하면 기본값 사용',
     'meeting=1234567890',
     'passcode=987654',
     'title=Zoom call',
@@ -234,7 +234,7 @@ export function scheduleCallCommandHelp() {
     '/schedule_call',
     'type=zoom',
     'at=2026-05-13 16:30',
-    'to=+16694449171  # 생략하면 기본값 사용',
+    'to=+82231439612  # 생략하면 기본값 사용',
     'meeting=1234567890',
     'passcode=987654',
     'title=Zoom call'
