@@ -50,7 +50,7 @@ function skipKeyboard() {
 }
 
 function callTypeKeyboard() {
-  return new Keyboard().text('1. Zoom link').text('2. Zoom dial-in').text('3. 일반 전화').text('/cancel').resized().oneTime();
+  return new Keyboard().text('1. 일반 전화').text('2. Zoom link').text('/cancel').resized().oneTime();
 }
 
 function removeKeyboard() {
@@ -61,9 +61,8 @@ async function promptCallForm(ctx, form) {
   const prompts = {
     type: [
       '통화 유형을 선택해주세요.',
-      '1. Zoom link: Zoom 링크로 브라우저 입장',
-      '2. Zoom dial-in: Zoom 전화 접속 번호로 입장',
-      '3. 일반 전화: 일반 컨퍼런스콜/ARS'
+      '1. 일반 전화: 일반 컨퍼런스콜/ARS',
+      '2. Zoom link: Zoom 링크로 브라우저 입장'
     ].join('\n'),
     zoomUrl: [
       'Zoom 접속 링크를 입력해주세요.',
@@ -247,14 +246,12 @@ async function handleCallFormMessage(ctx) {
   const skipped = lower === '/skip';
   try {
     if (form.step === 'type') {
-      if (['1', '1.', '1. zoom link', 'zoom link', 'link', '/zoomlink'].includes(lower)) {
-        form.data.type = 'zoom_link';
-      } else if (['2', '2.', '2. zoom dial-in', 'zoom dial-in', 'zoom', '/zoom'].includes(lower)) {
-        form.data.type = 'zoom';
-      } else if (['3', '3.', '3. 일반 전화', '일반 전화', 'phone', '/phone'].includes(lower)) {
+      if (['1', '1.', '1. 일반 전화', '일반 전화', 'phone', '/phone'].includes(lower)) {
         form.data.type = 'phone';
+      } else if (['2', '2.', '2. zoom link', 'zoom link', 'link', '/zoomlink', 'zoom', '/zoom'].includes(lower)) {
+        form.data.type = 'zoom_link';
       } else {
-        throw new Error('통화 유형은 1. Zoom link, 2. Zoom dial-in, 3. 일반 전화 중 하나를 선택해주세요.');
+        throw new Error('통화 유형은 1. 일반 전화 또는 2. Zoom link 중 하나를 선택해주세요.');
       }
       form.step = form.data.type === 'zoom_link' ? 'zoomUrl' : 'to';
     } else if (form.step === 'zoomUrl') {

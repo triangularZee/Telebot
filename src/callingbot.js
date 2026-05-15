@@ -205,7 +205,7 @@ export function formatKst(date) {
 export function callCommandHelp() {
   return [
     '사용법:',
-    '/call 을 보내면 일반 전화/Zoom dial-in 선택 화면이 시작됩니다.',
+    '/call 을 보내면 일반 전화/Zoom link 선택 화면이 시작됩니다.',
     '',
     '일반 전화 붙여넣기:',
     '/call',
@@ -215,7 +215,9 @@ export function callCommandHelp() {
     'title=251212_FY4Q25 Broadcom',
     'at=2026-05-15 16:30',
     '',
-    'Zoom dial-in 붙여넣기:',
+    'Zoom link는 /call 단계별 입력에서 선택하세요.',
+    '',
+    '기존 Zoom dial-in 붙여넣기도 호환은 됩니다:',
     '/call',
     'type=zoom',
     'to=+82231439612  # 생략하면 기본값 사용',
@@ -238,7 +240,7 @@ export function scheduleCallCommandHelp() {
     'code2=987654#',
     'title=251212_FY4Q25 Broadcom',
     '',
-    'Zoom 예약:',
+    '기존 Zoom dial-in 예약:',
     '/schedule_call',
     'type=zoom',
     'at=2026-05-13 16:30',
