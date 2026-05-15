@@ -30,19 +30,33 @@ export function buildDigitsFromCodes({ code1 = '', code2 = '' } = {}) {
   return [normalizeDialCode(code1), normalizeDialCode(code2)].filter(Boolean).join('');
 }
 
+function normalizeZoomCode(value = '') {
+  return String(value).trim().replace(/\s+/g, '');
+}
+
+function buildZoomDigits({ meetingId = '', passcode = '' } = {}) {
+  const meeting = normalizeZoomCode(meetingId);
+  const pass = normalizeZoomCode(passcode);
+  if (!meeting) return '';
+  return `ww${meeting}#ww#${pass ? `ww${pass}#` : ''}`;
+}
+
 export function parseCallCommand(text) {
   const entries = parseKeyValueLines(text);
+  const mode = String(entries.mode ?? entries.type ?? entries['유형'] ?? '').toLowerCase();
   const to = entries.to ?? entries.phone ?? entries.number ?? entries['전화번호'] ?? entries['번호'];
   const title = entries.title ?? entries.name ?? entries['제목'] ?? 'telegram-call';
   const note = entries.note ?? entries.context ?? entries.memo ?? entries['메모'] ?? entries['노트'] ?? '';
   const silenceTimeout = entries.silencetimeout ?? entries.silence ?? entries.timeout ?? entries['무음종료'] ?? '120';
-  const meetingId = entries.meeting ?? entries.meetingid ?? entries['회의번호'] ?? entries['미팅번호'];
+  const meetingId = entries.meeting ?? entries.meetingid ?? entries['meeting id'] ?? entries['회의번호'] ?? entries['미팅번호'];
   const password = entries.password ?? entries.passcode ?? entries.pin ?? entries['비밀번호'] ?? entries['암호'];
   const code1 = entries.code1 ?? entries['입력코드1'];
   const code2 = entries.code2 ?? entries['입력코드2'];
   let digits = entries.digits ?? entries.digit ?? entries.dtmf ?? entries['입력번호'] ?? entries['입력코드'];
 
-  if (!digits && (code1 || code2)) {
+  if (!digits && (mode === 'zoom' || mode === 'zoom dial-in') && meetingId) {
+    digits = buildZoomDigits({ meetingId, passcode: password });
+  } else if (!digits && (code1 || code2)) {
     digits = buildDigitsFromCodes({ code1, code2 });
   } else if (!digits && meetingId) {
     digits = `ww${meetingId.replace(/\s+/g, '')}#`;
@@ -180,23 +194,26 @@ export function formatKst(date) {
 export function callCommandHelp() {
   return [
     '사용법:',
-    '/call 을 보내면 단계별 입력 화면이 시작됩니다.',
+    '/call 을 보내면 일반 전화/Zoom dial-in 선택 화면이 시작됩니다.',
     '',
-    '붙여넣기 방식도 가능합니다:',
+    '일반 전화 붙여넣기:',
     '/call',
     'to=+18005551234',
     'code1=123456789#',
     'code2=987654#',
     'title=251212_FY4Q25 Broadcom',
     'at=2026-05-15 16:30',
-    'silenceTimeout=120',
+    '',
+    'Zoom dial-in 붙여넣기:',
+    '/call',
+    'type=zoom',
+    'to=+16694449171',
+    'meeting=1234567890',
+    'passcode=987654',
+    'title=Zoom call',
     '',
     'code1/code2는 자동으로 ww가 앞에 붙습니다.',
-    '이미 DTMF 전체를 알고 있으면:',
-    '/call',
-    'to=+18005551234',
-    'digits=wwww123456789#ww987654#',
-    'title=board-call'
+    '이미 DTMF 전체를 알고 있으면 digits=... 를 직접 넣을 수 있습니다.'
   ].join('\n');
 }
 
@@ -210,12 +227,14 @@ export function scheduleCallCommandHelp() {
     'code2=987654#',
     'title=251212_FY4Q25 Broadcom',
     '',
-    '상대 시간도 가능합니다:',
+    'Zoom 예약:',
     '/schedule_call',
-    'in=10m',
-    'to=+821022414700',
-    'title=test-call',
-    'note=연결 테스트'
+    'type=zoom',
+    'at=2026-05-13 16:30',
+    'to=+16694449171',
+    'meeting=1234567890',
+    'passcode=987654',
+    'title=Zoom call'
   ].join('\n');
 }
 

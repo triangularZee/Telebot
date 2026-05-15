@@ -47,20 +47,28 @@ function skipKeyboard() {
   return new Keyboard().text('/skip').text('/cancel').resized().oneTime();
 }
 
+function callTypeKeyboard() {
+  return new Keyboard().text('일반 전화').text('Zoom dial-in').text('/cancel').resized().oneTime();
+}
+
 function removeKeyboard() {
   return { remove_keyboard: true };
 }
 
 async function promptCallForm(ctx, form) {
   const prompts = {
-    to: [
-      '전화번호를 입력해주세요.',
-      '예: +821022414700 또는 01022414700'
+    type: [
+      '통화 유형을 선택해주세요.',
+      '일반 전화: 일반 컨퍼런스콜/ARS',
+      'Zoom dial-in: Zoom 전화 접속 번호로 입장'
     ].join('\n'),
+    to: form.data.type === 'zoom'
+      ? 'Zoom dial-in 전화번호를 입력해주세요.\n예: +16694449171'
+      : '전화번호를 입력해주세요.\n예: +821022414700 또는 01022414700',
     code1: [
       '입력코드1을 입력해주세요. 선택 항목입니다.',
       '입력하면 자동으로 앞에 ww가 붙습니다.',
-      '예: 572648# → ww572648#',
+      '예: 572648# -> ww572648#',
       '없으면 /skip'
     ].join('\n'),
     code2: [
@@ -68,25 +76,38 @@ async function promptCallForm(ctx, form) {
       '입력하면 자동으로 앞에 ww가 붙습니다.',
       '없으면 /skip'
     ].join('\n'),
-    title: [
-      '제목을 입력해주세요.',
-      '예: 251212_FY4Q25 Broadcom',
-      '기본값을 쓰려면 /skip'
+    meetingId: [
+      'Zoom Meeting ID를 입력해주세요.',
+      '예: 1234567890 또는 123 456 7890'
+    ].join('\n'),
+    passcode: [
+      'Zoom Passcode를 입력해주세요. 선택 항목입니다.',
+      '없으면 /skip'
     ].join('\n'),
     scheduledAt: [
       '예약일시를 입력해주세요. 선택 항목입니다.',
       '예: 2026-05-15 16:30, 05-15 16:30, 16:30, in=10m',
       '바로 전화하려면 /skip'
+    ].join('\n'),
+    title: [
+      '제목을 입력해주세요.',
+      '예: 251212_FY4Q25 Broadcom',
+      '기본값을 쓰려면 /skip'
     ].join('\n')
   };
 
-  const optional = form.step !== 'to';
-  await ctx.reply(prompts[form.step], optional ? { reply_markup: skipKeyboard() } : undefined);
+  if (form.step === 'type') {
+    await ctx.reply(prompts[form.step], { reply_markup: callTypeKeyboard() });
+    return;
+  }
+
+  const required = ['to', 'meetingId'].includes(form.step);
+  await ctx.reply(prompts[form.step], required ? undefined : { reply_markup: skipKeyboard() });
 }
 
 async function startCallForm(ctx) {
   const chatId = String(ctx.chat.id);
-  const form = { step: 'to', data: {} };
+  const form = { step: 'type', data: {} };
   callForms.set(chatId, form);
   await ctx.reply('CallingBot call setup을 시작합니다. 중간에 취소하려면 /cancel 을 보내주세요.');
   await promptCallForm(ctx, form);
@@ -101,14 +122,28 @@ function scheduleEntriesFromInput(value) {
   return { at: text };
 }
 
+function normalizeZoomCode(value = '') {
+  return String(value).trim().replace(/\s+/g, '');
+}
+
+function buildZoomDigits({ meetingId = '', passcode = '' } = {}) {
+  const meeting = normalizeZoomCode(meetingId);
+  const pass = normalizeZoomCode(passcode);
+  if (!meeting) return '';
+  return `ww${meeting}#ww#${pass ? `ww${pass}#` : ''}`;
+}
+
 async function finishCallForm(ctx, form) {
   const data = form.data;
+  const isZoom = data.type === 'zoom';
   const job = {
     to: normalizePhone(data.to),
     title: data.title || 'telegram-call',
     note: '',
     silenceTimeout: 120,
-    digits: buildDigitsFromCodes({ code1: data.code1, code2: data.code2 })
+    digits: isZoom
+      ? buildZoomDigits({ meetingId: data.meetingId, passcode: data.passcode })
+      : buildDigitsFromCodes({ code1: data.code1, code2: data.code2 })
   };
 
   if (data.scheduledAt) {
@@ -119,6 +154,7 @@ async function finishCallForm(ctx, form) {
       `id: ${item.id}`,
       `time: ${formatKst(scheduledAt)} KST`,
       `to: ${job.to}`,
+      `type: ${isZoom ? 'Zoom dial-in' : 'phone'}`,
       `digits: ${job.digits || '(none)'}`,
       `title: ${job.title}`
     ].join('\n'), { reply_markup: removeKeyboard() });
@@ -129,6 +165,7 @@ async function finishCallForm(ctx, form) {
   await ctx.reply([
     'CallingBot call started.',
     `to: ${job.to}`,
+    `type: ${isZoom ? 'Zoom dial-in' : 'phone'}`,
     `digits: ${job.digits || '(none)'}`,
     `title: ${job.title}`,
     result.callSid ? `callSid: ${result.callSid}` : JSON.stringify(result)
@@ -150,10 +187,26 @@ async function handleCallFormMessage(ctx) {
 
   const skipped = lower === '/skip';
   try {
-    if (form.step === 'to') {
+    if (form.step === 'type') {
+      if (['zoom dial-in', 'zoom', '/zoom'].includes(lower)) {
+        form.data.type = 'zoom';
+      } else if (['일반 전화', 'phone', '/phone'].includes(lower)) {
+        form.data.type = 'phone';
+      } else {
+        throw new Error('통화 유형은 일반 전화 또는 Zoom dial-in 중 하나를 선택해주세요.');
+      }
+      form.step = 'to';
+    } else if (form.step === 'to') {
       if (skipped || !text) throw new Error('전화번호는 필수입니다.');
       form.data.to = text;
-      form.step = 'code1';
+      form.step = form.data.type === 'zoom' ? 'meetingId' : 'code1';
+    } else if (form.step === 'meetingId') {
+      if (skipped || !text) throw new Error('Zoom Meeting ID는 필수입니다.');
+      form.data.meetingId = text;
+      form.step = 'passcode';
+    } else if (form.step === 'passcode') {
+      if (!skipped) form.data.passcode = text;
+      form.step = 'scheduledAt';
     } else if (form.step === 'code1') {
       if (!skipped) form.data.code1 = text;
       form.step = skipped ? 'scheduledAt' : 'code2';
