@@ -1,5 +1,7 @@
 import { config } from './config.js';
 
+const DEFAULT_ZOOM_DIAL_IN = '+16694449171';
+
 export function normalizePhone(value) {
   const cleaned = String(value).replace(/[^\d+]/g, '');
   if (cleaned.startsWith('+')) return cleaned;
@@ -44,7 +46,7 @@ function buildZoomDigits({ meetingId = '', passcode = '' } = {}) {
 export function parseCallCommand(text) {
   const entries = parseKeyValueLines(text);
   const mode = String(entries.mode ?? entries.type ?? entries['유형'] ?? '').toLowerCase();
-  const to = entries.to ?? entries.phone ?? entries.number ?? entries['전화번호'] ?? entries['번호'];
+  let to = entries.to ?? entries.phone ?? entries.number ?? entries['전화번호'] ?? entries['번호'];
   const title = entries.title ?? entries.name ?? entries['제목'] ?? 'telegram-call';
   const note = entries.note ?? entries.context ?? entries.memo ?? entries['메모'] ?? entries['노트'] ?? '';
   const silenceTimeout = entries.silencetimeout ?? entries.silence ?? entries.timeout ?? entries['무음종료'] ?? '120';
@@ -55,6 +57,7 @@ export function parseCallCommand(text) {
   let digits = entries.digits ?? entries.digit ?? entries.dtmf ?? entries['입력번호'] ?? entries['입력코드'];
 
   if (!digits && (mode === 'zoom' || mode === 'zoom dial-in') && meetingId) {
+    if (!to) to = DEFAULT_ZOOM_DIAL_IN;
     digits = buildZoomDigits({ meetingId, passcode: password });
   } else if (!digits && (code1 || code2)) {
     digits = buildDigitsFromCodes({ code1, code2 });
@@ -207,7 +210,7 @@ export function callCommandHelp() {
     'Zoom dial-in 붙여넣기:',
     '/call',
     'type=zoom',
-    'to=+16694449171',
+    'to=+16694449171  # 생략하면 기본값 사용',
     'meeting=1234567890',
     'passcode=987654',
     'title=Zoom call',
@@ -231,7 +234,7 @@ export function scheduleCallCommandHelp() {
     '/schedule_call',
     'type=zoom',
     'at=2026-05-13 16:30',
-    'to=+16694449171',
+    'to=+16694449171  # 생략하면 기본값 사용',
     'meeting=1234567890',
     'passcode=987654',
     'title=Zoom call'

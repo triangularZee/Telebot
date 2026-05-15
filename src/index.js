@@ -28,6 +28,7 @@ import {
 const bot = new Bot(config.botToken);
 const cwdByChat = new Map();
 const callForms = new Map();
+const DEFAULT_ZOOM_DIAL_IN = '+16694449171';
 
 function isAllowed(ctx) {
   return config.allowedChatIds.includes(String(ctx.chat?.id));
@@ -63,7 +64,11 @@ async function promptCallForm(ctx, form) {
       '2. 일반 전화: 일반 컨퍼런스콜/ARS'
     ].join('\n'),
     to: form.data.type === 'zoom'
-      ? 'Zoom dial-in 전화번호를 입력해주세요.\n예: +16694449171'
+      ? [
+        'Zoom dial-in 전화번호를 입력해주세요. 선택 항목입니다.',
+        `기본값: ${DEFAULT_ZOOM_DIAL_IN}`,
+        '초대장에 별도 dial-in 번호가 있으면 그 번호를 입력하고, 기본값을 쓰려면 /skip'
+      ].join('\n')
       : '전화번호를 입력해주세요.\n예: +821022414700 또는 01022414700',
     code1: [
       '입력코드1을 입력해주세요. 선택 항목입니다.',
@@ -101,7 +106,7 @@ async function promptCallForm(ctx, form) {
     return;
   }
 
-  const required = ['to', 'meetingId'].includes(form.step);
+  const required = form.step === 'meetingId' || (form.step === 'to' && form.data.type !== 'zoom');
   await ctx.reply(prompts[form.step], required ? undefined : { reply_markup: skipKeyboard() });
 }
 
@@ -197,8 +202,12 @@ async function handleCallFormMessage(ctx) {
       }
       form.step = 'to';
     } else if (form.step === 'to') {
-      if (skipped || !text) throw new Error('전화번호는 필수입니다.');
-      form.data.to = text;
+      if (form.data.type === 'zoom' && skipped) {
+        form.data.to = DEFAULT_ZOOM_DIAL_IN;
+      } else {
+        if (skipped || !text) throw new Error('전화번호는 필수입니다.');
+        form.data.to = text;
+      }
       form.step = form.data.type === 'zoom' ? 'meetingId' : 'code1';
     } else if (form.step === 'meetingId') {
       if (skipped || !text) throw new Error('Zoom Meeting ID는 필수입니다.');
