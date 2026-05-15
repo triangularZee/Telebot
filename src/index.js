@@ -87,6 +87,7 @@ async function promptCallForm(ctx, form) {
     ].join('\n'),
     passcode: [
       'Zoom Passcode를 입력해주세요. 선택 항목입니다.',
+      '전화 접속용 숫자 PW만 가능합니다. Zoom URL의 pwd= 알파벳 값은 전화 키패드로 입력할 수 없습니다.',
       '없으면 /skip'
     ].join('\n'),
     scheduledAt: [
@@ -131,10 +132,18 @@ function normalizeZoomCode(value = '') {
   return String(value).trim().replace(/\s+/g, '');
 }
 
+function validateDtmfValue(value, label) {
+  if (value && !/^[0-9*#]+$/.test(value)) {
+    throw new Error(`${label}는 전화 키패드로 입력 가능한 숫자, *, #만 사용할 수 있습니다. Zoom 링크의 pwd= 값이 아니라 초대장에 표시된 숫자 PW를 넣어주세요.`);
+  }
+}
+
 function buildZoomDigits({ meetingId = '', passcode = '' } = {}) {
   const meeting = normalizeZoomCode(meetingId);
   const pass = normalizeZoomCode(passcode);
   if (!meeting) return '';
+  validateDtmfValue(meeting, 'Zoom Meeting ID');
+  validateDtmfValue(pass, 'Zoom Passcode');
   return `ww${meeting}#ww#${pass ? `ww${pass}#` : ''}`;
 }
 
@@ -160,9 +169,10 @@ async function finishCallForm(ctx, form) {
       `time: ${formatKst(scheduledAt)} KST`,
       `to: ${job.to}`,
       `type: ${isZoom ? 'Zoom dial-in' : 'phone'}`,
-      `digits: ${job.digits || '(none)'}`,
+      isZoom ? `meeting: ${normalizeZoomCode(data.meetingId)}` : `digits: ${job.digits || '(none)'}`,
+      isZoom ? `passcode: ${normalizeZoomCode(data.passcode) || '(none)'}` : null,
       `title: ${job.title}`
-    ].join('\n'), { reply_markup: removeKeyboard() });
+    ].filter(Boolean).join('\n'), { reply_markup: removeKeyboard() });
     return;
   }
 
@@ -171,10 +181,11 @@ async function finishCallForm(ctx, form) {
     'CallingBot call started.',
     `to: ${job.to}`,
     `type: ${isZoom ? 'Zoom dial-in' : 'phone'}`,
-    `digits: ${job.digits || '(none)'}`,
+    isZoom ? `meeting: ${normalizeZoomCode(data.meetingId)}` : `digits: ${job.digits || '(none)'}`,
+    isZoom ? `passcode: ${normalizeZoomCode(data.passcode) || '(none)'}` : null,
     `title: ${job.title}`,
     result.callSid ? `callSid: ${result.callSid}` : JSON.stringify(result)
-  ].join('\n'), { reply_markup: removeKeyboard() });
+  ].filter(Boolean).join('\n'), { reply_markup: removeKeyboard() });
 }
 
 async function handleCallFormMessage(ctx) {

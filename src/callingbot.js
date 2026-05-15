@@ -36,10 +36,18 @@ function normalizeZoomCode(value = '') {
   return String(value).trim().replace(/\s+/g, '');
 }
 
+function validateDtmfValue(value, label) {
+  if (value && !/^[0-9*#]+$/.test(value)) {
+    throw new Error(`${label}는 전화 키패드로 입력 가능한 숫자, *, #만 사용할 수 있습니다. Zoom 링크의 pwd= 값이 아니라 초대장에 표시된 숫자 PW를 넣어주세요.`);
+  }
+}
+
 function buildZoomDigits({ meetingId = '', passcode = '' } = {}) {
   const meeting = normalizeZoomCode(meetingId);
   const pass = normalizeZoomCode(passcode);
   if (!meeting) return '';
+  validateDtmfValue(meeting, 'Zoom Meeting ID');
+  validateDtmfValue(pass, 'Zoom Passcode');
   return `ww${meeting}#ww#${pass ? `ww${pass}#` : ''}`;
 }
 
