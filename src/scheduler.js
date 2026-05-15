@@ -5,6 +5,7 @@ import { formatKst } from './callingbot.js';
 
 const schedulePath = path.join(config.stateDir, 'scheduled-calls.json');
 const CALL_LEAD_MS = 30_000;
+const DEFAULT_ZOOM_BOT_NAME = '신한 박시은';
 
 async function readSchedules() {
   try {
@@ -60,7 +61,7 @@ export function formatScheduledCall(item) {
     `time: ${formatKst(new Date(item.scheduledAt))} KST`,
     `call starts: ${formatKst(new Date(item.runAt ?? item.scheduledAt))} KST`,
     item.job.kind === 'zoom' ? `url: ${item.job.joinUrl}` : `to: ${item.job.to}`,
-    item.job.kind === 'zoom' ? `nickname: ${item.job.botName || '(default)'}` : null,
+    item.job.kind === 'zoom' ? `nickname: ${item.job.botName || DEFAULT_ZOOM_BOT_NAME}` : null,
     `title: ${item.job.title}`
   ].filter(Boolean).join('\n');
 }
@@ -95,14 +96,14 @@ export function startCallScheduler(bot, runner) {
             `time: ${formatKst(new Date(item.scheduledAt))} KST`,
             `call starts: ${formatKst(new Date(item.runAt ?? item.scheduledAt))} KST`,
             item.job.kind === 'zoom' ? `url: ${item.job.joinUrl}` : `to: ${item.job.to}`,
-            item.job.kind === 'zoom' ? `nickname: ${item.job.botName || '(default)'}` : null,
+            item.job.kind === 'zoom' ? `nickname: ${item.job.botName || DEFAULT_ZOOM_BOT_NAME}` : null,
             `title: ${item.job.title}`
           ].filter(Boolean).join('\n'));
           const result = await runner(item.job, { chatId: item.chatId });
           await bot.api.sendMessage(item.chatId, [
             item.job.kind === 'zoom' ? 'Zoom link bot started.' : 'CallingBot call started.',
             item.job.kind === 'zoom' ? `url: ${item.job.joinUrl}` : `to: ${item.job.to}`,
-            item.job.kind === 'zoom' ? `nickname: ${item.job.botName || '(default)'}` : null,
+            item.job.kind === 'zoom' ? `nickname: ${item.job.botName || DEFAULT_ZOOM_BOT_NAME}` : null,
             `title: ${item.job.title}`,
             result.callSid ? `callSid: ${result.callSid}` : JSON.stringify(result)
           ].filter(Boolean).join('\n'));

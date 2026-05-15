@@ -30,6 +30,7 @@ const bot = new Bot(config.botToken);
 const cwdByChat = new Map();
 const callForms = new Map();
 const DEFAULT_ZOOM_DIAL_IN = '+82231439612';
+const DEFAULT_ZOOM_BOT_NAME = '신한 박시은';
 
 function isAllowed(ctx) {
   return config.allowedChatIds.includes(String(ctx.chat?.id));
@@ -70,7 +71,7 @@ async function promptCallForm(ctx, form) {
     ].join('\n'),
     zoomBotName: [
       'Zoom 참가 닉네임을 입력해주세요. 선택 항목입니다.',
-      '예: AI Notes Bot, Market Review Bot',
+      `기본값: ${DEFAULT_ZOOM_BOT_NAME}`,
       '기본값을 쓰려면 /skip'
     ].join('\n'),
     to: form.data.type === 'zoom'
@@ -188,7 +189,7 @@ async function finishCallForm(ctx, form) {
         `id: ${item.id}`,
         `time: ${formatKst(scheduledAt)} KST`,
         `url: ${job.joinUrl}`,
-        `nickname: ${job.botName || '(default)'}`,
+        `nickname: ${job.botName || DEFAULT_ZOOM_BOT_NAME}`,
         `title: ${job.title}`
       ].join('\n'), { reply_markup: removeKeyboard() });
       return;
@@ -198,7 +199,7 @@ async function finishCallForm(ctx, form) {
     await ctx.reply([
       'Zoom link bot started.',
       `url: ${job.joinUrl}`,
-      `nickname: ${job.botName || '(default)'}`,
+      `nickname: ${job.botName || DEFAULT_ZOOM_BOT_NAME}`,
       `title: ${job.title}`,
       JSON.stringify(result)
     ].join('\n'), { reply_markup: removeKeyboard() });
