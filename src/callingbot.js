@@ -25,6 +25,7 @@ export function parseCallCommand(text) {
   const to = entries.to ?? entries.phone ?? entries.number ?? entries['전화번호'] ?? entries['번호'];
   const title = entries.title ?? entries.name ?? entries['제목'] ?? 'telegram-call';
   const note = entries.note ?? entries.context ?? entries.memo ?? entries['메모'] ?? entries['노트'] ?? entries['맥락'] ?? '';
+  const silenceTimeout = entries.silencetimeout ?? entries.silence ?? entries.timeout ?? entries['무음종료'] ?? '120';
   const meetingId = entries.meeting ?? entries.meetingid ?? entries['회의번호'] ?? entries['미팅번호'];
   const password = entries.password ?? entries.passcode ?? entries.pin ?? entries['비밀번호'] ?? entries['암호'];
   let digits = entries.digits ?? entries.dtmf ?? entries['입력번호'] ?? entries['누를번호'];
@@ -44,6 +45,7 @@ export function parseCallCommand(text) {
     to: normalizePhone(to),
     title,
     note,
+    silenceTimeout: Number(silenceTimeout),
     digits: digits ?? ''
   };
 }
@@ -172,6 +174,7 @@ export function callCommandHelp() {
     'password=987654',
     'title=251212_FY4Q25 Broadcom',
     'note=AI 매출, backlog, Q&A를 특히 자세히 정리',
+    'silenceTimeout=120',
     '',
     'DTMF 전체를 알고 있으면:',
     '/call',
