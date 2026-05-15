@@ -141,6 +141,11 @@ function normalizeZoomCode(value = '') {
   return String(value).trim().replace(/\s+/g, '');
 }
 
+function extractFirstUrl(value = '') {
+  const match = String(value).match(/https?:\/\/\S+/i);
+  return match ? match[0].replace(/[)>.,，。]+$/g, '') : String(value).trim();
+}
+
 function validateDtmfValue(value, label) {
   if (value && !/^[0-9*#]+$/.test(value)) {
     throw new Error(`${label}는 전화 키패드로 입력 가능한 숫자, *, #만 사용할 수 있습니다. Zoom 링크의 pwd= 값이 아니라 초대장에 표시된 숫자 PW를 넣어주세요.`);
@@ -256,7 +261,7 @@ async function handleCallFormMessage(ctx) {
       form.step = form.data.type === 'zoom_link' ? 'zoomUrl' : 'to';
     } else if (form.step === 'zoomUrl') {
       if (!text || skipped) throw new Error('Zoom 접속 링크는 필수입니다.');
-      form.data.zoomUrl = text;
+      form.data.zoomUrl = extractFirstUrl(text);
       form.step = 'scheduledAt';
     } else if (form.step === 'to') {
       if (form.data.type === 'zoom' && skipped) {
