@@ -4,6 +4,7 @@ import { config } from './config.js';
 import { formatKst } from './callingbot.js';
 
 const schedulePath = path.join(config.stateDir, 'scheduled-calls.json');
+const CALL_LEAD_MS = 30_000;
 
 async function readSchedules() {
   try {
@@ -24,15 +25,17 @@ async function writeSchedules(items) {
 export async function addScheduledCall({ chatId, job, scheduledAt }) {
   const items = await readSchedules();
   const id = `call-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const runAt = new Date(scheduledAt.getTime() - CALL_LEAD_MS);
   const item = {
     id,
     chatId: String(chatId),
     job,
     scheduledAt: scheduledAt.toISOString(),
+    runAt: runAt.toISOString(),
     createdAt: new Date().toISOString()
   };
   items.push(item);
-  items.sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt));
+  items.sort((a, b) => new Date(a.runAt ?? a.scheduledAt) - new Date(b.runAt ?? b.scheduledAt));
   await writeSchedules(items);
   return item;
 }
@@ -55,6 +58,7 @@ export function formatScheduledCall(item) {
   return [
     `id: ${item.id}`,
     `time: ${formatKst(new Date(item.scheduledAt))} KST`,
+    `call starts: ${formatKst(new Date(item.runAt ?? item.scheduledAt))} KST`,
     `to: ${item.job.to}`,
     `title: ${item.job.title}`
   ].join('\n');
@@ -67,7 +71,7 @@ async function popDueSchedules() {
   const pending = [];
 
   for (const item of items) {
-    if (new Date(item.scheduledAt).getTime() <= now) due.push(item);
+    if (new Date(item.runAt ?? item.scheduledAt).getTime() <= now) due.push(item);
     else pending.push(item);
   }
 
@@ -88,6 +92,7 @@ export function startCallScheduler(bot, runner) {
           await bot.api.sendMessage(item.chatId, [
             'Scheduled call starting.',
             `time: ${formatKst(new Date(item.scheduledAt))} KST`,
+            `call starts: ${formatKst(new Date(item.runAt ?? item.scheduledAt))} KST`,
             `to: ${item.job.to}`,
             `title: ${item.job.title}`
           ].join('\n'));
