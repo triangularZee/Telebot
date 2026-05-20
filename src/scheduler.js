@@ -55,6 +55,13 @@ export async function cancelScheduledCall(chatId, id) {
   return next.length !== items.length;
 }
 
+export async function cancelScheduledCalls(chatId) {
+  const items = await readSchedules();
+  const next = items.filter((item) => String(item.chatId) !== String(chatId));
+  await writeSchedules(next);
+  return items.length - next.length;
+}
+
 export function formatScheduledCall(item) {
   return [
     `id: ${item.id}`,

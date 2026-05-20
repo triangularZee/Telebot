@@ -48,7 +48,8 @@ npm start
 /hangup [callSid]
 /schedule_call
 /scheduled_calls
-/cancel_call id
+/cancel_schedule id
+/cancel_schedule all
 /ai prompt
 /claude prompt
 /gpt prompt
@@ -77,7 +78,8 @@ password=987654
 title=scheduled-call
 note=가이던스와 마진 코멘트 위주로 정리
 /scheduled_calls
-/cancel_call call-id
+/cancel_schedule call-id
+/cancel_schedule all
 /ai summarize this repository
 /claude summarize this repository
 /gpt summarize this repository

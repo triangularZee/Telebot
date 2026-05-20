@@ -21,6 +21,7 @@ import { providerLabel, runProvider } from './providers/index.js';
 import {
   addScheduledCall,
   cancelScheduledCall,
+  cancelScheduledCalls,
   formatScheduledCall,
   listScheduledCalls,
   startCallScheduler
@@ -369,7 +370,8 @@ function helpText() {
     '/hangup [callSid]',
     '/schedule_call',
     '/scheduled_calls',
-    '/cancel_call id',
+    '/cancel_schedule id',
+    '/cancel_schedule all',
     '/ai prompt',
     '/claude prompt',
     '/gpt prompt',
@@ -504,16 +506,23 @@ bot.command('scheduled_calls', async (ctx) => {
   }
 });
 
-bot.command('cancel_call', async (ctx) => {
+async function handleCancelSchedule(ctx) {
   try {
     const id = argText(ctx);
-    if (!id) throw new Error('Usage: /cancel_call id');
+    if (!id) throw new Error('Usage: /cancel_schedule id\nList schedules with /scheduled_calls');
+    if (['all', '*'].includes(id.toLowerCase())) {
+      const count = await cancelScheduledCalls(ctx.chat.id);
+      await ctx.reply(count ? `Cancelled ${count} scheduled call(s).` : 'No scheduled calls.');
+      return;
+    }
     const cancelled = await cancelScheduledCall(ctx.chat.id, id);
     await ctx.reply(cancelled ? `Cancelled: ${id}` : `No scheduled call found: ${id}`);
   } catch (error) {
     await ctx.reply(`Error: ${error.message}`);
   }
-});
+}
+
+bot.command(['cancel_schedule', 'cancel_scheduled', 'cancel_call'], handleCancelSchedule);
 
 async function handleAi(ctx, provider) {
   let progress = null;
