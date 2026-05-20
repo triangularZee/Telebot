@@ -206,6 +206,8 @@ export function callCommandHelp() {
   return [
     '사용법:',
     '/call 을 보내면 일반 전화/Zoom link 선택 화면이 시작됩니다.',
+    '/call schedule 로 예약 목록을 봅니다.',
+    '/call history 로 통화/예약 내역을 봅니다.',
     '',
     '일반 전화 붙여넣기:',
     '/call',

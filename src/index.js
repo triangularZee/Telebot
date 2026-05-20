@@ -18,6 +18,7 @@ import {
 } from './callingbot.js';
 import { listDir, readTextFile, resolveFrom, runCommand } from './shell.js';
 import { providerLabel, runProvider } from './providers/index.js';
+import { addCallHistory, formatCallHistoryItem, listCallHistory } from './callHistory.js';
 import {
   addScheduledCall,
   cancelScheduledCall,
@@ -52,7 +53,16 @@ function skipKeyboard() {
 }
 
 function callTypeKeyboard() {
-  return new Keyboard().text('1. 일반 전화').text('2. Zoom link').text('/cancel').resized().oneTime();
+  return new Keyboard()
+    .text('1. 일반 전화')
+    .text('2. Zoom link')
+    .row()
+    .text('3. 예약 목록')
+    .text('4. 통화 내역')
+    .row()
+    .text('/cancel')
+    .resized()
+    .oneTime();
 }
 
 function removeKeyboard() {
@@ -131,7 +141,12 @@ async function startCallForm(ctx) {
   const chatId = String(ctx.chat.id);
   const form = { step: 'type', data: {} };
   callForms.set(chatId, form);
-  await ctx.reply('CallingBot call setup을 시작합니다. 중간에 취소하려면 /cancel 을 보내주세요.');
+  await ctx.reply([
+    'CallingBot call setup을 시작합니다.',
+    '예약 목록: /call schedule',
+    '통화 내역: /call history',
+    '중간에 취소하려면 /cancel'
+  ].join('\n'));
   await promptCallForm(ctx, form);
 }
 
@@ -185,6 +200,15 @@ async function finishCallForm(ctx, form) {
     if (data.scheduledAt) {
       const scheduledAt = parseScheduleTime(scheduleEntriesFromInput(data.scheduledAt));
       const item = await addScheduledCall({ chatId: ctx.chat.id, job, scheduledAt });
+      await addCallHistory({
+        chatId: ctx.chat.id,
+        event: 'scheduled',
+        source: 'form',
+        job,
+        scheduleId: item.id,
+        scheduledAt: item.scheduledAt,
+        runAt: item.runAt
+      });
       await ctx.reply([
         'Zoom link bot scheduled.',
         `id: ${item.id}`,
@@ -197,6 +221,13 @@ async function finishCallForm(ctx, form) {
     }
 
     const result = await startCallingBotZoom(job, { chatId: ctx.chat.id });
+    await addCallHistory({
+      chatId: ctx.chat.id,
+      event: 'started',
+      source: 'form',
+      job,
+      result
+    });
     await ctx.reply([
       'Zoom link bot started.',
       `url: ${job.joinUrl}`,
@@ -220,6 +251,15 @@ async function finishCallForm(ctx, form) {
   if (data.scheduledAt) {
     const scheduledAt = parseScheduleTime(scheduleEntriesFromInput(data.scheduledAt));
     const item = await addScheduledCall({ chatId: ctx.chat.id, job, scheduledAt });
+    await addCallHistory({
+      chatId: ctx.chat.id,
+      event: 'scheduled',
+      source: 'form',
+      job,
+      scheduleId: item.id,
+      scheduledAt: item.scheduledAt,
+      runAt: item.runAt
+    });
     await ctx.reply([
       'CallingBot call scheduled.',
       `id: ${item.id}`,
@@ -234,6 +274,13 @@ async function finishCallForm(ctx, form) {
   }
 
   const result = await startCallingBotCall(job, { chatId: ctx.chat.id });
+  await addCallHistory({
+    chatId: ctx.chat.id,
+    event: 'started',
+    source: 'form',
+    job,
+    result
+  });
   await ctx.reply([
     'CallingBot call started.',
     `to: ${job.to}`,
@@ -261,12 +308,22 @@ async function handleCallFormMessage(ctx) {
   const skipped = lower === '/skip';
   try {
     if (form.step === 'type') {
+      if (['3', '3.', '3. 예약 목록', '예약 목록', 'schedule', 'scheduled', 'schedules', '/scheduled_calls'].includes(lower)) {
+        await replyScheduledCalls(ctx);
+        await promptCallForm(ctx, form);
+        return true;
+      }
+      if (['4', '4.', '4. 통화 내역', '통화 내역', 'history', 'log', 'logs', '내역', '/call_history'].includes(lower)) {
+        await replyCallHistory(ctx);
+        await promptCallForm(ctx, form);
+        return true;
+      }
       if (['1', '1.', '1. 일반 전화', '일반 전화', 'phone', '/phone'].includes(lower)) {
         form.data.type = 'phone';
       } else if (['2', '2.', '2. zoom link', 'zoom link', 'link', '/zoomlink', 'zoom', '/zoom'].includes(lower)) {
         form.data.type = 'zoom_link';
       } else {
-        throw new Error('통화 유형은 1. 일반 전화 또는 2. Zoom link 중 하나를 선택해주세요.');
+        throw new Error('통화 유형은 1. 일반 전화, 2. Zoom link, 3. 예약 목록, 4. 통화 내역 중 하나를 선택해주세요.');
       }
       form.step = form.data.type === 'zoom_link' ? 'zoomUrl' : 'to';
     } else if (form.step === 'zoomUrl') {
@@ -322,6 +379,24 @@ async function replyLong(ctx, text) {
   }
 }
 
+async function replyScheduledCalls(ctx) {
+  const items = await listScheduledCalls(ctx.chat.id);
+  if (!items.length) {
+    await ctx.reply('No scheduled calls.');
+    return;
+  }
+  await replyLong(ctx, items.map(formatScheduledCall).join('\n\n'));
+}
+
+async function replyCallHistory(ctx) {
+  const items = await listCallHistory(ctx.chat.id, 20);
+  if (!items.length) {
+    await ctx.reply('No call history yet.');
+    return;
+  }
+  await replyLong(ctx, items.map(formatCallHistoryItem).join('\n\n'));
+}
+
 async function startProgress(ctx, label) {
   const frames = [
     `${label} is processing`,
@@ -367,9 +442,12 @@ function helpText() {
     '/cat path',
     '/run command',
     '/call',
+    '/call schedule',
+    '/call history',
     '/hangup [callSid]',
     '/schedule_call',
     '/scheduled_calls',
+    '/call_history',
     '/cancel_schedule id',
     '/cancel_schedule all',
     '/ai prompt',
@@ -442,12 +520,52 @@ bot.command('run', async (ctx) => {
 
 bot.command('call', async (ctx) => {
   try {
-    if (!argText(ctx)) {
+    const arg = argText(ctx);
+    const lower = arg.toLowerCase();
+    if (!arg) {
       await startCallForm(ctx);
+      return;
+    }
+    if (['schedule', 'scheduled', 'schedules', '예약', '예약목록'].includes(lower)) {
+      await replyScheduledCalls(ctx);
+      return;
+    }
+    if (['history', 'log', 'logs', '내역', '통화내역'].includes(lower)) {
+      await replyCallHistory(ctx);
+      return;
+    }
+    const entries = parseKeyValueLines(ctx.message?.text ?? '');
+    const hasSchedule = ['at', 'time', 'datetime', 'in', 'after', '예약', '예약일시', '시간'].some((key) => entries[key]);
+    if (hasSchedule) {
+      const { job, scheduledAt } = parseScheduleCallCommand(ctx.message?.text ?? '');
+      const item = await addScheduledCall({ chatId: ctx.chat.id, job, scheduledAt });
+      await addCallHistory({
+        chatId: ctx.chat.id,
+        event: 'scheduled',
+        source: 'command',
+        job,
+        scheduleId: item.id,
+        scheduledAt: item.scheduledAt,
+        runAt: item.runAt
+      });
+      await ctx.reply([
+        'CallingBot call scheduled.',
+        `id: ${item.id}`,
+        `time: ${formatKst(scheduledAt)} KST`,
+        `to: ${job.to}`,
+        `title: ${job.title}`
+      ].join('\n'));
       return;
     }
     const job = parseCallCommand(ctx.message?.text ?? '');
     const result = await startCallingBotCall(job, { chatId: ctx.chat.id });
+    await addCallHistory({
+      chatId: ctx.chat.id,
+      event: 'started',
+      source: 'command',
+      job,
+      result
+    });
     await ctx.reply([
       'CallingBot call started.',
       `to: ${job.to}`,
@@ -481,6 +599,15 @@ bot.command('schedule_call', async (ctx) => {
   try {
     const { job, scheduledAt } = parseScheduleCallCommand(ctx.message?.text ?? '');
     const item = await addScheduledCall({ chatId: ctx.chat.id, job, scheduledAt });
+    await addCallHistory({
+      chatId: ctx.chat.id,
+      event: 'scheduled',
+      source: 'command',
+      job,
+      scheduleId: item.id,
+      scheduledAt: item.scheduledAt,
+      runAt: item.runAt
+    });
     await ctx.reply([
       'CallingBot call scheduled.',
       `id: ${item.id}`,
@@ -495,12 +622,15 @@ bot.command('schedule_call', async (ctx) => {
 
 bot.command('scheduled_calls', async (ctx) => {
   try {
-    const items = await listScheduledCalls(ctx.chat.id);
-    if (!items.length) {
-      await ctx.reply('No scheduled calls.');
-      return;
-    }
-    await replyLong(ctx, items.map(formatScheduledCall).join('\n\n'));
+    await replyScheduledCalls(ctx);
+  } catch (error) {
+    await ctx.reply(`Error: ${error.message}`);
+  }
+});
+
+bot.command(['call_history', 'call_logs', 'calls'], async (ctx) => {
+  try {
+    await replyCallHistory(ctx);
   } catch (error) {
     await ctx.reply(`Error: ${error.message}`);
   }
@@ -511,11 +641,35 @@ async function handleCancelSchedule(ctx) {
     const id = argText(ctx);
     if (!id) throw new Error('Usage: /cancel_schedule id\nList schedules with /scheduled_calls');
     if (['all', '*'].includes(id.toLowerCase())) {
+      const items = await listScheduledCalls(ctx.chat.id);
       const count = await cancelScheduledCalls(ctx.chat.id);
+      for (const item of items) {
+        await addCallHistory({
+          chatId: ctx.chat.id,
+          event: 'cancelled',
+          source: 'command',
+          job: item.job,
+          scheduleId: item.id,
+          scheduledAt: item.scheduledAt,
+          runAt: item.runAt
+        });
+      }
       await ctx.reply(count ? `Cancelled ${count} scheduled call(s).` : 'No scheduled calls.');
       return;
     }
+    const item = (await listScheduledCalls(ctx.chat.id)).find((candidate) => candidate.id === id);
     const cancelled = await cancelScheduledCall(ctx.chat.id, id);
+    if (cancelled && item) {
+      await addCallHistory({
+        chatId: ctx.chat.id,
+        event: 'cancelled',
+        source: 'command',
+        job: item.job,
+        scheduleId: item.id,
+        scheduledAt: item.scheduledAt,
+        runAt: item.runAt
+      });
+    }
     await ctx.reply(cancelled ? `Cancelled: ${id}` : `No scheduled call found: ${id}`);
   } catch (error) {
     await ctx.reply(`Error: ${error.message}`);

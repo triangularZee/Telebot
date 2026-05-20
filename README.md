@@ -45,9 +45,12 @@ npm start
 /cat path
 /run command
 /call
+/call schedule
+/call history
 /hangup [callSid]
 /schedule_call
 /scheduled_calls
+/call_history
 /cancel_schedule id
 /cancel_schedule all
 /ai prompt
@@ -78,6 +81,9 @@ password=987654
 title=scheduled-call
 note=가이던스와 마진 코멘트 위주로 정리
 /scheduled_calls
+/call schedule
+/call_history
+/call history
 /cancel_schedule call-id
 /cancel_schedule all
 /ai summarize this repository

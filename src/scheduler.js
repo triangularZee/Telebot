@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from './config.js';
 import { formatKst } from './callingbot.js';
+import { addCallHistory } from './callHistory.js';
 
 const schedulePath = path.join(config.stateDir, 'scheduled-calls.json');
 const CALL_LEAD_MS = 30_000;
@@ -107,6 +108,16 @@ export function startCallScheduler(bot, runner) {
             `title: ${item.job.title}`
           ].filter(Boolean).join('\n'));
           const result = await runner(item.job, { chatId: item.chatId });
+          await addCallHistory({
+            chatId: item.chatId,
+            event: 'started',
+            source: 'scheduled',
+            job: item.job,
+            scheduleId: item.id,
+            scheduledAt: item.scheduledAt,
+            runAt: item.runAt,
+            result
+          });
           await bot.api.sendMessage(item.chatId, [
             item.job.kind === 'zoom' ? 'Zoom link bot started.' : 'CallingBot call started.',
             item.job.kind === 'zoom' ? `url: ${item.job.joinUrl}` : `to: ${item.job.to}`,
@@ -115,6 +126,16 @@ export function startCallScheduler(bot, runner) {
             result.callSid ? `callSid: ${result.callSid}` : JSON.stringify(result)
           ].filter(Boolean).join('\n'));
         } catch (error) {
+          await addCallHistory({
+            chatId: item.chatId,
+            event: 'failed',
+            source: 'scheduled',
+            job: item.job,
+            scheduleId: item.id,
+            scheduledAt: item.scheduledAt,
+            runAt: item.runAt,
+            error
+          });
           await bot.api.sendMessage(item.chatId, `Scheduled call failed: ${error.message}`);
         }
       }
