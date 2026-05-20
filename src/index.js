@@ -164,7 +164,7 @@ function normalizeZoomCode(value = '') {
 }
 
 function extractFirstUrl(value = '') {
-  const match = String(value).match(/https?:\/\/\S+/i);
+  const match = String(value).match(/https?:\/\/[^\s<>"'`,}\]]+/i);
   return match ? match[0].replace(/[)>.,，。]+$/g, '') : String(value).trim();
 }
 
