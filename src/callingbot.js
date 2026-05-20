@@ -5,7 +5,7 @@ const DEFAULT_ZOOM_DIAL_IN = '+82231439612';
 export function normalizePhone(value) {
   const cleaned = String(value).replace(/[^\d+]/g, '');
   if (cleaned.startsWith('+')) return cleaned;
-  if (cleaned.startsWith('010')) return `+82${cleaned.slice(1)}`;
+  if (cleaned.startsWith('0')) return `+82${cleaned.slice(1)}`;
   if (cleaned.startsWith('82')) return `+${cleaned}`;
   return cleaned;
 }
