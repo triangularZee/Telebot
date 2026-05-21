@@ -80,6 +80,14 @@ function scheduleKeyboard() {
     .oneTime();
 }
 
+function scheduleCancelKeyboard(items) {
+  const keyboard = new Keyboard();
+  for (const item of items) {
+    keyboard.text(item.id).row();
+  }
+  return keyboard.text('/skip').text('/cancel').resized().oneTime();
+}
+
 function removeKeyboard() {
   return { remove_keyboard: true };
 }
@@ -334,11 +342,11 @@ async function cancelScheduledCallById(ctx, rawId, source = 'command') {
   const items = await listScheduledCalls(ctx.chat.id);
   const matches = items.filter((item) => item.id === id || item.id.startsWith(id));
   if (matches.length === 0) {
-    await ctx.reply(`No scheduled call found: ${id}`, { reply_markup: scheduleKeyboard() });
+    await ctx.reply(`No scheduled call found: ${id}`, { reply_markup: scheduleCancelKeyboard(items) });
     return;
   }
   if (matches.length > 1) {
-    await ctx.reply(`예약 id가 여러 개와 일치합니다. 더 길게 입력해주세요: ${matches.map((item) => item.id).join(', ')}`, { reply_markup: scheduleKeyboard() });
+    await ctx.reply(`예약 id가 여러 개와 일치합니다. 더 길게 입력해주세요: ${matches.map((item) => item.id).join(', ')}`, { reply_markup: scheduleCancelKeyboard(matches) });
     return;
   }
 
@@ -368,12 +376,12 @@ async function promptCancelSchedule(ctx, form) {
 
   form.step = 'cancelScheduleId';
   await ctx.reply([
-    '취소할 예약 id를 입력해주세요.',
+    '취소할 예약 id를 아래 버튼에서 선택하거나 직접 입력해주세요.',
     '',
     items.map(formatScheduledCall).join('\n\n'),
     '',
     '취소하지 않으려면 /skip 또는 /cancel'
-  ].join('\n'), { reply_markup: skipKeyboard() });
+  ].join('\n'), { reply_markup: scheduleCancelKeyboard(items) });
 }
 
 async function handleCallFormMessage(ctx) {
