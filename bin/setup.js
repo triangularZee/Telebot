@@ -58,6 +58,20 @@ function escapeXml(value) {
     .replace(/'/g, '&apos;');
 }
 
+function escapePowerShellString(value) {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+function defaultEnvDir() {
+  if (os.platform() === 'darwin') {
+    return path.join(homeDir, 'Library', 'Application Support', 'telebot');
+  }
+  if (os.platform() === 'win32') {
+    return path.join(process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local'), 'telebot');
+  }
+  return path.join(process.env.XDG_STATE_HOME || path.join(homeDir, '.local', 'state'), 'telebot');
+}
+
 function writeEnv(target, values) {
   const lines = Object.entries(values).map(([key, value]) => `${key}=${value}`);
   fs.writeFileSync(target, `${lines.join('\n')}\n`, { mode: 0o600 });
@@ -153,24 +167,49 @@ function setupMac(envPath) {
   console.log(`Logs: tail -f ${logDir}/telebot.log`);
 }
 
+function setupWindows(envPath) {
+  const taskName = 'Triangular Telebot';
+  const logDir = path.join(process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local'), 'telebot');
+  const logPath = path.join(logDir, 'telebot.log');
+  fs.mkdirSync(logDir, { recursive: true });
+
+  const command = [
+    `$env:DOTENV_CONFIG_PATH=${escapePowerShellString(envPath)}`,
+    `Set-Location ${escapePowerShellString(repoRoot)}`,
+    `& ${escapePowerShellString(process.execPath)} -r dotenv/config ${escapePowerShellString(path.join(repoRoot, 'src', 'index.js'))} *>> ${escapePowerShellString(logPath)}`
+  ].join('; ');
+  const taskRun = `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command ${JSON.stringify(command)}`;
+
+  spawnSync('schtasks', ['/Create', '/TN', taskName, '/SC', 'ONLOGON', '/TR', taskRun, '/RL', 'LIMITED', '/F'], { stdio: 'inherit' });
+  spawnSync('schtasks', ['/Run', '/TN', taskName], { stdio: 'inherit' });
+
+  console.log(`Task Scheduler task: ${taskName}`);
+  console.log(`Status: schtasks /Query /TN "${taskName}" /V /FO LIST`);
+  console.log(`Logs: ${logPath}`);
+}
+
 const args = parseArgs();
 const token = requireArg(args, 'token');
 const chatId = requireArg(args, 'chat-id');
 const root = path.resolve(args.root ? String(args.root) : homeDir);
 const timeout = String(args.timeout ?? 60000);
 const maxOutput = String(args['max-output'] ?? 3500);
+const allowDangerousRun = String(args['allow-dangerous-run'] ?? process.env.TELEBOT_ALLOW_DANGEROUS_RUN ?? 'false');
 const aiProvider = String(args['ai-provider'] ?? 'claude');
 const claudeModel = String(args['claude-model'] ?? process.env.CLAUDE_MODEL ?? 'claude-sonnet-4-6');
 const claudeEffort = String(args['claude-effort'] ?? process.env.CLAUDE_EFFORT ?? 'medium');
 const claudeContinue = String(args['claude-continue'] ?? process.env.CLAUDE_CONTINUE ?? 'true');
+const claudePermissionMode = String(args['claude-permission-mode'] ?? process.env.CLAUDE_PERMISSION_MODE ?? 'default');
+const claudeAllowDangerousPermissions = String(args['claude-allow-dangerous-permissions'] ?? process.env.CLAUDE_ALLOW_DANGEROUS_PERMISSIONS ?? 'false');
 const openaiApiKey = String(args['openai-api-key'] ?? process.env.OPENAI_API_KEY ?? '');
 const openaiModel = String(args['openai-model'] ?? process.env.OPENAI_MODEL ?? 'gpt-4o-mini');
 const googleAiApiKey = String(args['google-ai-api-key'] ?? process.env.GOOGLE_AI_API_KEY ?? process.env.GEMINI_API_KEY ?? '');
 const geminiModel = String(args['gemini-model'] ?? process.env.GEMINI_MODEL ?? 'gemini-2.5-flash');
 const callingBotBaseUrl = String(args['callingbot-base-url'] ?? process.env.CALLINGBOT_BASE_URL ?? 'http://localhost:3000');
-const envDir = os.platform() === 'darwin'
-  ? path.join(homeDir, 'Library', 'Application Support', 'telebot')
-  : path.join(process.env.XDG_STATE_HOME || path.join(homeDir, '.local', 'state'), 'telebot');
+const defaultZoomDialIn = String(args['default-zoom-dial-in'] ?? process.env.CALLINGBOT_DEFAULT_ZOOM_DIAL_IN ?? '+82231439612');
+const defaultZoomBotName = String(args['default-zoom-bot-name'] ?? process.env.CALLINGBOT_DEFAULT_ZOOM_BOT_NAME ?? '신한 박시은');
+const maxScheduleLag = String(args['max-schedule-lag-ms'] ?? process.env.TELEBOT_MAX_SCHEDULE_LAG_MS ?? 6 * 60 * 60 * 1000);
+const envDir = defaultEnvDir();
 const envPath = path.join(envDir, '.env');
 
 fs.mkdirSync(envDir, { recursive: true });
@@ -178,19 +217,27 @@ writeEnv(envPath, {
   TELEGRAM_BOT_TOKEN: token,
   TELEGRAM_ALLOWED_CHAT_IDS: chatId,
   TELEBOT_ROOT_DIR: root,
+  TELEBOT_STATE_DIR: envDir,
   TELEBOT_COMMAND_TIMEOUT_MS: timeout,
   TELEBOT_MAX_OUTPUT_CHARS: maxOutput,
+  TELEBOT_ALLOW_DANGEROUS_RUN: allowDangerousRun,
   AI_PROVIDER: aiProvider,
   CLAUDE_MODEL: claudeModel,
   CLAUDE_EFFORT: claudeEffort,
   CLAUDE_CONTINUE: claudeContinue,
+  CLAUDE_PERMISSION_MODE: claudePermissionMode,
+  CLAUDE_ALLOW_DANGEROUS_PERMISSIONS: claudeAllowDangerousPermissions,
   OPENAI_API_KEY: openaiApiKey,
   OPENAI_MODEL: openaiModel,
   GOOGLE_AI_API_KEY: googleAiApiKey,
   GEMINI_MODEL: geminiModel,
-  CALLINGBOT_BASE_URL: callingBotBaseUrl
+  CALLINGBOT_BASE_URL: callingBotBaseUrl,
+  CALLINGBOT_DEFAULT_ZOOM_DIAL_IN: defaultZoomDialIn,
+  CALLINGBOT_DEFAULT_ZOOM_BOT_NAME: defaultZoomBotName,
+  TELEBOT_MAX_SCHEDULE_LAG_MS: maxScheduleLag
 });
 
 if (os.platform() === 'linux') setupLinux(envPath);
 else if (os.platform() === 'darwin') setupMac(envPath);
-else throw new Error(`Unsupported platform: ${os.platform()}`);
+else if (os.platform() === 'win32') setupWindows(envPath);
+else throw new Error(`Unsupported platform: ${os.platform()}. Run npm start manually with DOTENV_CONFIG_PATH=${envPath}.`);

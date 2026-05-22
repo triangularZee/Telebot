@@ -8,12 +8,10 @@ export async function runClaude(prompt, { cwd }) {
   const permissionMode = config.claudePermissionMode === 'yolo'
     ? 'bypassPermissions'
     : config.claudePermissionMode;
-  const permissionArg = permissionMode === 'bypassPermissions'
-    ? ' --permission-mode bypassPermissions --dangerously-skip-permissions'
-    : ` --permission-mode ${JSON.stringify(permissionMode)}`;
+  const permissionArg = buildPermissionArg(permissionMode);
   const result = await runCommandRaw(
     cwd,
-    `claude -p${continueArg}${modelArg}${effortArg}${permissionArg} --max-budget-usd 1 ${JSON.stringify(prompt)} < /dev/null`
+    `claude -p${continueArg}${modelArg}${effortArg}${permissionArg} --max-budget-usd 1 ${JSON.stringify(prompt)}`
   );
 
   if (result.code !== 0) {
@@ -23,4 +21,14 @@ export async function runClaude(prompt, { cwd }) {
   return result.stderr
     ? `${result.stdout}\n\nstderr:\n${result.stderr}`
     : result.stdout;
+}
+
+function buildPermissionArg(permissionMode) {
+  if (permissionMode === 'bypassPermissions') {
+    if (!config.claudeAllowDangerousPermissions) {
+      throw new Error('CLAUDE_PERMISSION_MODE=bypassPermissions/yolo requires CLAUDE_ALLOW_DANGEROUS_PERMISSIONS=true');
+    }
+    return ' --permission-mode bypassPermissions --dangerously-skip-permissions';
+  }
+  return ` --permission-mode ${JSON.stringify(permissionMode)}`;
 }

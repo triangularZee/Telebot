@@ -1,28 +1,20 @@
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config } from './config.js';
 import { formatKst } from './callingbot.js';
+import { readJsonFile, updateJsonFile, withFileLock } from './stateFile.js';
 
 const historyPath = path.join(config.stateDir, 'call-history.json');
 const MAX_HISTORY_ITEMS = 300;
 
-async function readHistory() {
-  try {
-    const text = await fs.readFile(historyPath, 'utf8');
-    const items = JSON.parse(text);
-    return Array.isArray(items) ? items : [];
-  } catch (error) {
-    if (error.code === 'ENOENT') return [];
-    throw error;
-  }
+async function readHistoryFile() {
+  const items = await readJsonFile(historyPath, []);
+  return Array.isArray(items) ? items : [];
 }
 
-async function writeHistory(items) {
-  await fs.mkdir(config.stateDir, { recursive: true });
-  const trimmed = items
+function trimHistory(items) {
+  return items
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
     .slice(-MAX_HISTORY_ITEMS);
-  await fs.writeFile(historyPath, JSON.stringify(trimmed, null, 2), 'utf8');
 }
 
 function summarizeJob(job = {}) {
@@ -47,32 +39,37 @@ export async function addCallHistory({
   result = null,
   error = ''
 }) {
-  const items = await readHistory();
-  const item = {
-    id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-    chatId: String(chatId),
-    event,
-    source,
-    ...summarizeJob(job),
-    scheduleId,
-    scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : '',
-    runAt: runAt ? new Date(runAt).toISOString() : '',
-    callSid: result?.callSid ?? '',
-    status: result?.status ?? result?.statusCode ?? '',
-    error: error instanceof Error ? error.message : String(error || ''),
-    createdAt: new Date().toISOString()
-  };
-  items.push(item);
-  await writeHistory(items);
-  return item;
+  return updateJsonFile(historyPath, [], async (items) => {
+    const safeItems = Array.isArray(items) ? items : [];
+    const item = {
+      id: `hist-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      chatId: String(chatId),
+      event,
+      source,
+      ...summarizeJob(job),
+      scheduleId,
+      scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : '',
+      runAt: runAt ? new Date(runAt).toISOString() : '',
+      callSid: result?.callSid ?? '',
+      status: result?.status ?? result?.statusCode ?? '',
+      error: error instanceof Error ? error.message : String(error || ''),
+      createdAt: new Date().toISOString()
+    };
+    return {
+      next: trimHistory([...safeItems, item]),
+      result: item
+    };
+  });
 }
 
 export async function listCallHistory(chatId, limit = 20) {
-  const items = await readHistory();
-  return items
-    .filter((item) => !chatId || String(item.chatId) === String(chatId))
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, limit);
+  return withFileLock(historyPath, async () => {
+    const items = await readHistoryFile();
+    return items
+      .filter((item) => !chatId || String(item.chatId) === String(chatId))
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, limit);
+  });
 }
 
 export function formatCallHistoryItem(item) {

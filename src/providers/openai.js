@@ -1,13 +1,18 @@
 import OpenAI from 'openai';
 import { config } from '../config.js';
 
-export async function runOpenAI(prompt) {
+let client = null;
+
+function openaiClient() {
   if (!config.openaiApiKey) {
     throw new Error('OPENAI_API_KEY is required for OpenAI provider');
   }
+  if (!client) client = new OpenAI({ apiKey: config.openaiApiKey });
+  return client;
+}
 
-  const client = new OpenAI({ apiKey: config.openaiApiKey });
-  const response = await client.chat.completions.create({
+export async function runOpenAI(prompt) {
+  const response = await openaiClient().chat.completions.create({
     model: config.openaiModel,
     messages: [
       { role: 'system', content: 'You are a concise assistant responding through Telegram.' },

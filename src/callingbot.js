@@ -1,7 +1,5 @@
 import { config } from './config.js';
 
-const DEFAULT_ZOOM_DIAL_IN = '+82231439612';
-
 export function normalizePhone(value) {
   const cleaned = String(value).replace(/[^\d+]/g, '');
   if (cleaned.startsWith('+')) return cleaned;
@@ -32,17 +30,17 @@ export function buildDigitsFromCodes({ code1 = '', code2 = '' } = {}) {
   return [normalizeDialCode(code1), normalizeDialCode(code2)].filter(Boolean).join('');
 }
 
-function normalizeZoomCode(value = '') {
+export function normalizeZoomCode(value = '') {
   return String(value).trim().replace(/\s+/g, '');
 }
 
-function validateDtmfValue(value, label) {
+export function validateDtmfValue(value, label) {
   if (value && !/^[0-9*#]+$/.test(value)) {
     throw new Error(`${label}는 전화 키패드로 입력 가능한 숫자, *, #만 사용할 수 있습니다. Zoom 링크의 pwd= 값이 아니라 초대장에 표시된 숫자 PW를 넣어주세요.`);
   }
 }
 
-function buildZoomDigits({ meetingId = '', passcode = '' } = {}) {
+export function buildZoomDigits({ meetingId = '', passcode = '' } = {}) {
   const meeting = normalizeZoomCode(meetingId);
   const pass = normalizeZoomCode(passcode);
   if (!meeting) return '';
@@ -65,7 +63,7 @@ export function parseCallCommand(text) {
   let digits = entries.digits ?? entries.digit ?? entries.dtmf ?? entries['입력번호'] ?? entries['입력코드'];
 
   if (!digits && (mode === 'zoom' || mode === 'zoom dial-in') && meetingId) {
-    if (!to) to = DEFAULT_ZOOM_DIAL_IN;
+    if (!to) to = config.defaultZoomDialIn;
     digits = buildZoomDigits({ meetingId, passcode: password });
   } else if (!digits && (code1 || code2)) {
     digits = buildDigitsFromCodes({ code1, code2 });
@@ -222,7 +220,7 @@ export function callCommandHelp() {
     '기존 Zoom dial-in 붙여넣기도 호환은 됩니다:',
     '/call',
     'type=zoom',
-    'to=+82231439612  # 생략하면 기본값 사용',
+    `to=${config.defaultZoomDialIn}  # 생략하면 기본값 사용`,
     'meeting=1234567890',
     'passcode=987654',
     'title=Zoom call',
@@ -246,7 +244,7 @@ export function scheduleCallCommandHelp() {
     '/schedule_call',
     'type=zoom',
     'at=2026-05-13 16:30',
-    'to=+82231439612  # 생략하면 기본값 사용',
+    `to=${config.defaultZoomDialIn}  # 생략하면 기본값 사용`,
     'meeting=1234567890',
     'passcode=987654',
     'title=Zoom call'
@@ -254,63 +252,29 @@ export function scheduleCallCommandHelp() {
 }
 
 export async function startCallingBotCall(job, { chatId } = {}) {
-  const baseUrl = config.callingBotBaseUrl.replace(/\/$/, '');
-  const response = await fetch(`${baseUrl}/api/call`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ...job,
-      notifyChatId: chatId ? String(chatId) : ''
-    })
-  });
-
-  const text = await response.text();
-  let body;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    body = { raw: text };
-  }
-
-  if (!response.ok) {
-    throw new Error(body.error ?? `CallingBot API failed: ${response.status}`);
-  }
-
-  return body;
+  return postCallingBot('/api/call', {
+    ...job,
+    notifyChatId: chatId ? String(chatId) : ''
+  }, `CallingBot API failed`);
 }
 
 export async function startCallingBotZoom(job, { chatId } = {}) {
-  const baseUrl = config.callingBotBaseUrl.replace(/\/$/, '');
-  const response = await fetch(`${baseUrl}/api/zoom`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ...job,
-      notifyChatId: chatId ? String(chatId) : ''
-    })
-  });
-
-  const text = await response.text();
-  let body;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    body = { raw: text };
-  }
-
-  if (!response.ok) {
-    throw new Error(body.error ?? `CallingBot Zoom API failed: ${response.status}`);
-  }
-
-  return body;
+  return postCallingBot('/api/zoom', {
+    ...job,
+    notifyChatId: chatId ? String(chatId) : ''
+  }, `CallingBot Zoom API failed`);
 }
 
 export async function hangupCallingBotCall(callSid = '') {
+  return postCallingBot('/api/hangup', { callSid }, `CallingBot hangup failed`);
+}
+
+async function postCallingBot(endpoint, payload, fallbackMessage) {
   const baseUrl = config.callingBotBaseUrl.replace(/\/$/, '');
-  const response = await fetch(`${baseUrl}/api/hangup`, {
+  const response = await fetch(`${baseUrl}${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ callSid })
+    body: JSON.stringify(payload)
   });
 
   const text = await response.text();
@@ -322,7 +286,7 @@ export async function hangupCallingBotCall(callSid = '') {
   }
 
   if (!response.ok) {
-    throw new Error(body.error ?? `CallingBot hangup failed: ${response.status}`);
+    throw new Error(body.error ?? `${fallbackMessage}: ${response.status}`);
   }
 
   return body;

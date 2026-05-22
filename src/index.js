@@ -1,13 +1,14 @@
 import { Bot, Keyboard } from 'grammy';
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import { config } from './config.js';
 import {
+  buildZoomDigits,
   callCommandHelp,
   buildDigitsFromCodes,
   formatKst,
   hangupCallingBotCall,
   normalizePhone,
+  normalizeZoomCode,
   parseCallCommand,
   parseKeyValueLines,
   parseScheduleCallCommand,
@@ -16,7 +17,7 @@ import {
   startCallingBotCall,
   startCallingBotZoom
 } from './callingbot.js';
-import { listDir, readTextFile, resolveFrom, runCommand } from './shell.js';
+import { listDir, readTextFile, resolveExistingFrom, runCommand } from './shell.js';
 import { providerLabel, runProvider } from './providers/index.js';
 import { addCallHistory, formatCallHistoryItem, listCallHistory } from './callHistory.js';
 import {
@@ -31,8 +32,6 @@ import {
 const bot = new Bot(config.botToken);
 const cwdByChat = new Map();
 const callForms = new Map();
-const DEFAULT_ZOOM_DIAL_IN = '+82231439612';
-const DEFAULT_ZOOM_BOT_NAME = '신한 박시은';
 
 function isAllowed(ctx) {
   return config.allowedChatIds.includes(String(ctx.chat?.id));
@@ -107,13 +106,13 @@ async function promptCallForm(ctx, form) {
     ].join('\n'),
     zoomBotName: [
       'Zoom 참가 닉네임을 입력해주세요. 선택 항목입니다.',
-      `기본값: ${DEFAULT_ZOOM_BOT_NAME}`,
+      `기본값: ${config.defaultZoomBotName}`,
       '기본값을 쓰려면 /skip'
     ].join('\n'),
     to: form.data.type === 'zoom'
       ? [
         'Zoom dial-in 전화번호를 입력해주세요. 선택 항목입니다.',
-        `기본값: ${DEFAULT_ZOOM_DIAL_IN}`,
+        `기본값: ${config.defaultZoomDialIn}`,
         '초대장에 별도 dial-in 번호가 있으면 그 번호를 입력하고, 기본값을 쓰려면 /skip'
       ].join('\n')
       : '전화번호를 입력해주세요.\n예: +821022414700 또는 01022414700',
@@ -184,28 +183,9 @@ function scheduleEntriesFromInput(value) {
   return { at: text };
 }
 
-function normalizeZoomCode(value = '') {
-  return String(value).trim().replace(/\s+/g, '');
-}
-
 function extractFirstUrl(value = '') {
   const match = String(value).match(/https?:\/\/[^\s<>"'`,}\]]+/i);
   return match ? match[0].replace(/[)>.,，。]+$/g, '') : String(value).trim();
-}
-
-function validateDtmfValue(value, label) {
-  if (value && !/^[0-9*#]+$/.test(value)) {
-    throw new Error(`${label}는 전화 키패드로 입력 가능한 숫자, *, #만 사용할 수 있습니다. Zoom 링크의 pwd= 값이 아니라 초대장에 표시된 숫자 PW를 넣어주세요.`);
-  }
-}
-
-function buildZoomDigits({ meetingId = '', passcode = '' } = {}) {
-  const meeting = normalizeZoomCode(meetingId);
-  const pass = normalizeZoomCode(passcode);
-  if (!meeting) return '';
-  validateDtmfValue(meeting, 'Zoom Meeting ID');
-  validateDtmfValue(pass, 'Zoom Passcode');
-  return `ww${meeting}#ww#${pass ? `ww${pass}#` : ''}`;
 }
 
 async function finishCallForm(ctx, form) {
@@ -239,7 +219,7 @@ async function finishCallForm(ctx, form) {
         `id: ${item.id}`,
         `time: ${formatKst(scheduledAt)} KST`,
         `url: ${job.joinUrl}`,
-        `nickname: ${job.botName || DEFAULT_ZOOM_BOT_NAME}`,
+        `nickname: ${job.botName || config.defaultZoomBotName}`,
         `title: ${job.title}`
       ].join('\n'), { reply_markup: removeKeyboard() });
       return;
@@ -256,7 +236,7 @@ async function finishCallForm(ctx, form) {
     await ctx.reply([
       'Zoom link bot started.',
       `url: ${job.joinUrl}`,
-      `nickname: ${job.botName || DEFAULT_ZOOM_BOT_NAME}`,
+      `nickname: ${job.botName || config.defaultZoomBotName}`,
       `title: ${job.title}`,
       JSON.stringify(result)
     ].join('\n'), { reply_markup: removeKeyboard() });
@@ -430,7 +410,7 @@ async function handleCallFormMessage(ctx) {
       form.step = 'scheduledAt';
     } else if (form.step === 'to') {
       if (form.data.type === 'zoom' && skipped) {
-        form.data.to = DEFAULT_ZOOM_DIAL_IN;
+        form.data.to = config.defaultZoomDialIn;
       } else {
         if (skipped || !text) throw new Error('전화번호는 필수입니다.');
         form.data.to = text;
@@ -478,8 +458,8 @@ async function handleCallFormMessage(ctx) {
 
 async function replyLong(ctx, text) {
   const safe = text || '(no output)';
-  for (let i = 0; i < safe.length; i += 3900) {
-    await ctx.reply(safe.slice(i, i + 3900));
+  for (let i = 0; i < safe.length; i += config.telegramMessageChunkChars) {
+    await ctx.reply(safe.slice(i, i + config.telegramMessageChunkChars));
   }
 }
 
@@ -598,7 +578,7 @@ bot.command('cd', async (ctx) => {
   try {
     const target = argText(ctx);
     if (!target) throw new Error('Usage: /cd path');
-    const nextCwd = resolveFrom(cwdFor(ctx), target);
+    const nextCwd = await resolveExistingFrom(cwdFor(ctx), target);
     const stat = await fs.stat(nextCwd);
     if (!stat.isDirectory()) throw new Error('Not a directory');
     cwdByChat.set(String(ctx.chat.id), nextCwd);
@@ -807,8 +787,40 @@ bot.catch((error) => {
   console.error('Telegram bot error:', error);
 });
 
-startCallScheduler(bot, (job, options) => (
+const stopScheduler = startCallScheduler(bot, (job, options) => (
   job.kind === 'zoom' ? startCallingBotZoom(job, options) : startCallingBotCall(job, options)
 ));
-bot.start();
-console.log(`Telebot started. root=${config.rootDir}`);
+
+let shuttingDown = false;
+
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`Telebot shutting down after ${signal}`);
+  stopScheduler();
+  await bot.stop();
+}
+
+process.once('SIGINT', () => {
+  shutdown('SIGINT').catch((error) => {
+    console.error('Graceful shutdown failed:', error);
+    process.exitCode = 1;
+  });
+});
+
+process.once('SIGTERM', () => {
+  shutdown('SIGTERM').catch((error) => {
+    console.error('Graceful shutdown failed:', error);
+    process.exitCode = 1;
+  });
+});
+
+bot.start({
+  onStart: (botInfo) => {
+    console.log(`Telebot started as @${botInfo.username}. root=${config.rootDir}`);
+  }
+}).catch((error) => {
+  console.error('Telebot failed to start:', error);
+  stopScheduler();
+  process.exitCode = 1;
+});
