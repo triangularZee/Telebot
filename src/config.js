@@ -48,7 +48,7 @@ export const config = {
   aiProvider: process.env.AI_PROVIDER ?? 'claude',
   claudeModel: process.env.CLAUDE_MODEL ?? 'claude-sonnet-4-6',
   claudeEffort: process.env.CLAUDE_EFFORT ?? 'medium',
-  claudeContinue: (process.env.CLAUDE_CONTINUE ?? 'true').toLowerCase() === 'true',
+  claudeContinue: boolFromEnv('CLAUDE_CONTINUE', true),
   claudePermissionMode: process.env.CLAUDE_PERMISSION_MODE ?? 'default',
   claudeAllowDangerousPermissions: boolFromEnv('CLAUDE_ALLOW_DANGEROUS_PERMISSIONS', false),
   openaiApiKey: process.env.OPENAI_API_KEY ?? '',

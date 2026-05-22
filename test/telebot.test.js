@@ -21,6 +21,7 @@ const {
   buildZoomDigits,
   normalizePhone,
   parseCallCommand,
+  parseKeyValueLines,
   parseScheduleTime
 } = await import('../src/callingbot.js');
 const { addCallHistory, listCallHistory } = await import('../src/callHistory.js');
@@ -62,6 +63,33 @@ test('parses relative schedule times in the future', () => {
 
   assert.ok(delta >= 59_000);
   assert.ok(delta <= 61_000);
+});
+
+test('parses absolute schedule date formats as KST', () => {
+  assert.equal(
+    parseScheduleTime({ at: '2099-05-15 16:30' }).toISOString(),
+    '2099-05-15T07:30:00.000Z'
+  );
+  assert.equal(
+    parseScheduleTime({ at: '12-31 23:59' }).getUTCFullYear(),
+    2026
+  );
+  assert.ok(parseScheduleTime({ at: '16:30' }).getTime() > Date.now());
+});
+
+test('parses key-value lines and ignores command lines', () => {
+  assert.deepEqual(parseKeyValueLines([
+    '/call',
+    'Title: Earnings Call',
+    ' to = +1 555 000 0000 ',
+    '',
+    '/ignored=command',
+    'note: keep = signs in values'
+  ].join('\n')), {
+    title: 'Earnings Call',
+    to: '+1 555 000 0000',
+    note: 'keep = signs in values'
+  });
 });
 
 test('keeps resolved paths inside TELEBOT_ROOT_DIR', () => {

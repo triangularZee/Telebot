@@ -13,14 +13,18 @@ export async function withFileLock(filePath, task) {
   const current = new Promise((resolve) => {
     release = resolve;
   });
+  const tail = previous.catch(() => {}).then(() => current);
 
-  fileQueues.set(filePath, previous.catch(() => {}).then(() => current));
+  fileQueues.set(filePath, tail);
   await previous.catch(() => {});
 
   try {
     return await task();
   } finally {
     release();
+    current.finally(() => {
+      if (fileQueues.get(filePath) === tail) fileQueues.delete(filePath);
+    });
   }
 }
 

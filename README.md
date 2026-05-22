@@ -94,7 +94,7 @@ note=가이던스와 마진 코멘트 위주로 정리
 ```
 
 `/run` executes commands on the machine running Telebot. Keep the bot token private and restrict `TELEGRAM_ALLOWED_CHAT_IDS`.
-By default Telebot keeps file commands inside `TELEBOT_ROOT_DIR`, writes `/run` audit events to `run-audit.log`, and blocks obviously destructive commands such as `rm -rf`, `shutdown`, disk formatting, and `Remove-Item -Recurse -Force`. Set `TELEBOT_ALLOW_DANGEROUS_RUN=true` only if you intentionally accept full remote shell risk.
+By default Telebot keeps file commands inside `TELEBOT_ROOT_DIR`, writes `/run` audit events to `run-audit.log`, and blocks obviously destructive commands such as `rm -rf`, `shutdown`, disk formatting, and `Remove-Item -Recurse -Force`. This filter is defense in depth, not a sandbox, and shell obfuscation or indirect execution can bypass it. Set `TELEBOT_ALLOW_DANGEROUS_RUN=true` only if you intentionally accept full remote shell risk.
 `/claude` runs `claude -p` in the current working directory. Claude Code must already be installed and authenticated on the remote machine.
 `CLAUDE_PERMISSION_MODE=bypassPermissions` or `yolo` is refused unless `CLAUDE_ALLOW_DANGEROUS_PERMISSIONS=true` is also set.
 `/ai` uses `AI_PROVIDER`; `/claude`, `/gpt`, and `/gemini` force a specific provider.

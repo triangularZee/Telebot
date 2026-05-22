@@ -19,12 +19,15 @@ export function clampOutput(text) {
 }
 
 export function isInsideRoot(targetPath) {
-  const root = path.resolve(config.rootDir);
-  const resolved = path.resolve(targetPath);
-  const comparableRoot = os.platform() === 'win32' ? root.toLowerCase() : root;
-  const comparableResolved = os.platform() === 'win32' ? resolved.toLowerCase() : resolved;
-  const relative = path.relative(comparableRoot, comparableResolved);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+  const root = comparablePath(config.rootDir);
+  const resolved = comparablePath(targetPath);
+  const rootWithSeparator = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
+  return resolved === root || resolved.startsWith(rootWithSeparator);
+}
+
+function comparablePath(value) {
+  const normalized = path.normalize(path.resolve(value));
+  return os.platform() === 'win32' ? normalized.toLowerCase() : normalized;
 }
 
 export function assertInsideRoot(targetPath) {
